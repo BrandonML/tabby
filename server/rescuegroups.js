@@ -20,10 +20,22 @@ function normalizeUrl(value) {
   return null;
 }
 
+function timestampValue(value) {
+  if (typeof value !== "string") return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function newestTimestamp(candidateA, candidateB) {
+  const times = [timestampValue(candidateA), timestampValue(candidateB)].filter((value) => value !== null);
+  if (!times.length) return null;
+  return new Date(Math.max(...times)).toISOString();
+}
+
 function isRecentEnough(value) {
   if (!value) return true;
-  const time = Date.parse(value);
-  if (!Number.isFinite(time)) return true;
+  const time = timestampValue(value);
+  if (time === null) return true;
   return Date.now() - time <= ONE_YEAR_MS;
 }
 
@@ -80,7 +92,7 @@ export function normalizeCards(payload) {
     if (!picture) return null;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
-    const updatedAt = attrs.updatedDate || attrs.updatedAt || null;
+    const updatedAt = newestTimestamp(attrs.updatedDate, attrs.updatedAt);
     if (!isRecentEnough(updatedAt)) return null;
     const profileUrl = normalizeUrl(attrs.url || org?.attributes?.url || null);
     const rescueUrl = normalizeUrl(org?.attributes?.url || null);

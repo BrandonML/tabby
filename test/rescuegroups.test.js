@@ -87,6 +87,24 @@ test("normalizer rejects stale cards when the API uses updatedAt instead of upda
   assert.deepEqual(cards, []);
 });
 
+test("normalizer prefers the most recent of updatedDate and updatedAt", () => {
+  const recent = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString();
+  const older = new Date(Date.now() - 1000 * 60 * 60 * 24 * 400).toISOString();
+  const cards = normalizeCards({
+    data: [{
+      id: "choose-newest",
+      attributes: { name: "Nova", updatedDate: older, updatedAt: recent, url: "www.example.com/nova" },
+      relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } }
+    }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Nova Rescue", url: "www.novarescue.test" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/nova.jpg" } } }
+    ]
+  });
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].updatedAt, recent);
+});
+
 test("normalizer rejects placeholder and malformed http values", () => {
   const cards = normalizeCards({
     data: [{ id: "1", attributes: { name: "Milo", updatedDate: new Date().toISOString(), url: "http://", profileUrl: "http://" }, relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } } }],
