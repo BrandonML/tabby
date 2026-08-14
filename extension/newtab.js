@@ -33,11 +33,23 @@ function renderCard(card, { stale = false } = {}) {
   const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away` : null;
   const updatedAt = readingFormat(card.updatedAt);
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
-  const rescueUrl = card.rescueUrl || card.profileUrl;
+  const rescueUrl = normalizeUrl(card.rescueUrl || card.profileUrl);
+  const profileUrl = normalizeUrl(card.profileUrl);
   $("card").className = "card";
-  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${card.profileUrl ? `<a class="profile" href="${escapeAttribute(card.profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
+  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
   $("notice").textContent = stale ? "Showing a recent saved match while we refresh." : "";
   $("card").querySelector("img").addEventListener("error", () => { $("notice").textContent = "That photo is no longer available. Refresh to try another cat."; });
+}
+
+function normalizeUrl(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
 }
 
 function escapeHtml(value = "") { const el = document.createElement("span"); el.textContent = value; return el.innerHTML; }
@@ -86,5 +98,5 @@ async function start({ requestLocation = false } = {}) {
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 $("use-location").addEventListener("click", () => start({ requestLocation: true }));
-$("zip-form").addEventListener("submit", async (event) => { event.preventDefault(); const postalcode = $("zip").value.trim(); if (!/^\d{5}$/.test(postalcode)) return; const { settings = {} } = await storageGet(["settings"]); await storageSet({ settings: { ...settings, postalcode } }); $("location-panel").hidden = true; await start(); });
+$("zip-form").addEventListener("submit", async (event) => { event.preventDefault(); const postalcode = $("zip").value.trim(); if (!/^\d{5}$/.test(postalcode)) return; const { settings = {} } = await storageGet(["settings"]); const nextSettings = { ...settings, postalcode }; await storageSet({ settings: nextSettings, feedCache: null }); $("location-panel").hidden = true; await start(); });
 start();

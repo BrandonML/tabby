@@ -2,6 +2,25 @@ const BASE_URL = "https://api.rescuegroups.org/v5";
 const CONTENT_TYPE = "application/vnd.api+json";
 const RADIUS_STEPS = [10, 25, 50, 100];
 const MAX_LIMIT = 25;
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function normalizeUrl(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
+function isRecentEnough(value) {
+  if (!value) return true;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return true;
+  return Date.now() - time <= ONE_YEAR_MS;
+}
 
 const ANIMAL_FIELDS = [
   "name", "ageString", "sex", "distance", "url", "pictureCount",
@@ -56,6 +75,10 @@ export function normalizeCards(payload) {
     if (!picture) return null;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
+    const updatedAt = attrs.updatedDate || null;
+    if (!isRecentEnough(updatedAt)) return null;
+    const profileUrl = normalizeUrl(attrs.url || org?.attributes?.url || null);
+    const rescueUrl = normalizeUrl(org?.attributes?.url || null);
     return {
       id: String(animal.id),
       name: attrs.name || "Unnamed cat",
@@ -65,15 +88,15 @@ export function normalizeCards(payload) {
       distanceMiles: Number.isFinite(attrs.distance) ? attrs.distance : null,
       imageUrl: picture.large?.url || picture.original?.url,
       originalImageUrl: picture.original?.url || null,
-      profileUrl: attrs.url || org?.attributes?.url || null,
+      profileUrl,
       profileUrlKind: attrs.url ? "animal" : org?.attributes?.url ? "organization" : null,
       rescueName: org?.attributes?.name || "Rescue organization",
-      rescueUrl: org?.attributes?.url || null,
+      rescueUrl,
       isAdoptionPending: Boolean(attrs.isAdoptionPending),
       isSpecialNeeds: Boolean(attrs.isSpecialNeeds),
       adoptionFee: attrs.adoptionFeeString || null,
       description: attrs.descriptionText || null,
-      updatedAt: attrs.updatedDate || null
+      updatedAt
     };
   }).filter(Boolean);
 }
