@@ -56,7 +56,10 @@ closeSettings.addEventListener("click", () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const [tab] = tabs;
     if (tab?.id) {
-      chrome.tabs.update(tab.id, { url: "chrome://new-tab-page/" });
+      const extensionUrl = chrome.runtime.getURL("newtab.html");
+      chrome.tabs.create({ url: extensionUrl, active: true }, () => {
+        chrome.tabs.remove(tab.id);
+      });
       return;
     }
     window.close();

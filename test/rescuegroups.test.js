@@ -54,3 +54,16 @@ test("normalizer drops stale cards and normalizes scheme-less rescue URLs", () =
   assert.equal(cards[0].profileUrl, "https://www.example.com/milo");
   assert.equal(cards[0].rescueUrl, "https://www.freshrescue.test");
 });
+
+test("normalizer rejects placeholder and malformed http values", () => {
+  const cards = normalizeCards({
+    data: [{ id: "1", attributes: { name: "Milo", updatedDate: new Date().toISOString(), url: "http://", profileUrl: "http://" }, relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } } }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Fresh Rescue", url: "http:/www.robinhoodanimalrescue.org" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/fresh.jpg" } } }
+    ]
+  });
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].profileUrl, null);
+  assert.equal(cards[0].rescueUrl, "http://www.robinhoodanimalrescue.org");
+});

@@ -6,13 +6,18 @@ const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 function normalizeUrl(value) {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+  const trimmed = value.trim().replace(/\s+/g, "");
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https?:\/\/?$/i.test(trimmed)) return null;
+  if (/^https?:\/\//i.test(trimmed)) {
+    const fixed = trimmed.replace(/^https?:\/+(?!\/)/i, (match) => match.includes("//") ? match : `${match}/`);
+    return fixed.startsWith("http:/") && !fixed.startsWith("http://") ? fixed.replace(/^http:\//i, "http://") : fixed;
+  }
   if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^http:\//i.test(trimmed)) return trimmed.replace(/^http:\//i, "http://");
   if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
   if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
-  return trimmed;
+  return null;
 }
 
 function isRecentEnough(value) {

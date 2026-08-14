@@ -56,20 +56,25 @@ function renderCard(card, { stale = false } = {}) {
   const profileUrl = normalizeUrl(card.profileUrl);
   $("card").className = "card";
   $("card").hidden = false;
-  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
+  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue">${escapeHtml(card.rescueName)}</p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
   $("card").querySelector("img").addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
 }
 
 function normalizeUrl(value) {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+  const trimmed = value.trim().replace(/\s+/g, "");
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https?:\/\/?$/i.test(trimmed)) return null;
+  if (/^https?:\/\//i.test(trimmed)) {
+    const fixed = trimmed.replace(/^https?:\/+(?!\/)/i, (match) => match.includes("//") ? match : `${match}/`);
+    return fixed.startsWith("http:/") && !fixed.startsWith("http://") ? fixed.replace(/^http:\//i, "http://") : fixed;
+  }
   if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^http:\//i.test(trimmed)) return trimmed.replace(/^http:\//i, "http://");
   if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
   if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
-  return trimmed;
+  return null;
 }
 
 function escapeHtml(value = "") { const el = document.createElement("span"); el.textContent = value; return el.innerHTML; }
@@ -97,12 +102,14 @@ async function refresh(location, settings) {
   await storageSet({ feedCache: nextCache });
   if (!feed.cards?.length) {
     setCardVisible(false);
+    $("location-panel").hidden = true;
     showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
     return;
   }
   const { selected, nextSeenIds } = nextCard(feed.cards, seenIds);
   const finalCache = { ...nextCache, seenIds: nextSeenIds };
   await storageSet({ feedCache: finalCache });
+  $("location-panel").hidden = true;
   renderCard(selected);
   showNotice(`Showing results within ${feed.radiusMiles} miles.`);
 }
@@ -120,6 +127,7 @@ async function start({ requestLocation = false } = {}) {
   }
   const location = await resolveLocation(settings, requestLocation);
   if (!location) { $("location-panel").hidden = false; return; }
+  $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
     try { await refresh(location, settings); } catch (error) {
       const message = /five-digit|postal code|zip code|invalid/i.test(error.message) ? "That ZIP code looks invalid. Please update it." : error.message || "Unable to refresh nearby cats right now.";
