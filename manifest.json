@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Tabby - Nearby Adoptable Cats",
+  "version": "0.1.0",
+  "description": "A cache-first new-tab experience for nearby adoptable cats.",
+  "permissions": ["storage", "geolocation"],
+  "background": {
+    "service_worker": "extension/service-worker.js",
+    "type": "module"
+  },
+  "chrome_url_overrides": {
+    "newtab": "extension/newtab.html"
+  },
+  "options_page": "extension/options.html"
+}
