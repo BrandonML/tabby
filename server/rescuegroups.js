@@ -2,11 +2,47 @@ const BASE_URL = "https://api.rescuegroups.org/v5";
 const CONTENT_TYPE = "application/vnd.api+json";
 const RADIUS_STEPS = [10, 25, 50, 100];
 const MAX_LIMIT = 25;
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function normalizeUrl(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\s+/g, "");
+  if (!trimmed) return null;
+  if (/^https?:\/\/?$/i.test(trimmed)) return null;
+  if (/^https?:\/\//i.test(trimmed)) {
+    const fixed = trimmed.replace(/^https?:\/+(?!\/)/i, (match) => match.includes("//") ? match : `${match}/`);
+    return fixed.startsWith("http:/") && !fixed.startsWith("http://") ? fixed.replace(/^http:\//i, "http://") : fixed;
+  }
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^http:\//i.test(trimmed)) return trimmed.replace(/^http:\//i, "http://");
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
+
+function timestampValue(value) {
+  if (typeof value !== "string") return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function newestTimestamp(candidateA, candidateB) {
+  const times = [timestampValue(candidateA), timestampValue(candidateB)].filter((value) => value !== null);
+  if (!times.length) return null;
+  return new Date(Math.max(...times)).toISOString();
+}
+
+function isRecentEnough(value) {
+  if (!value) return true;
+  const time = timestampValue(value);
+  if (time === null) return true;
+  return Date.now() - time <= ONE_YEAR_MS;
+}
 
 const ANIMAL_FIELDS = [
   "name", "ageString", "sex", "distance", "url", "pictureCount",
   "pictureThumbnailUrl", "breedString", "descriptionText", "isSpecialNeeds",
-  "isAdoptionPending", "updatedDate", "adoptionFeeString"
+  "isAdoptionPending", "updatedDate", "updatedAt", "adoptionFeeString"
 ].join(",");
 
 export function validateLocation(input) {
@@ -56,6 +92,10 @@ export function normalizeCards(payload) {
     if (!picture) return null;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
+    const updatedAt = newestTimestamp(attrs.updatedDate, attrs.updatedAt);
+    if (!isRecentEnough(updatedAt)) return null;
+    const profileUrl = normalizeUrl(attrs.url || org?.attributes?.url || null);
+    const rescueUrl = normalizeUrl(org?.attributes?.url || null);
     return {
       id: String(animal.id),
       name: attrs.name || "Unnamed cat",
@@ -65,14 +105,15 @@ export function normalizeCards(payload) {
       distanceMiles: Number.isFinite(attrs.distance) ? attrs.distance : null,
       imageUrl: picture.large?.url || picture.original?.url,
       originalImageUrl: picture.original?.url || null,
-      profileUrl: attrs.url || org?.attributes?.url || null,
+      profileUrl,
       profileUrlKind: attrs.url ? "animal" : org?.attributes?.url ? "organization" : null,
       rescueName: org?.attributes?.name || "Rescue organization",
+      rescueUrl,
       isAdoptionPending: Boolean(attrs.isAdoptionPending),
       isSpecialNeeds: Boolean(attrs.isSpecialNeeds),
       adoptionFee: attrs.adoptionFeeString || null,
       description: attrs.descriptionText || null,
-      updatedAt: attrs.updatedDate || null
+      updatedAt
     };
   }).filter(Boolean);
 }

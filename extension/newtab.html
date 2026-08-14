@@ -4,11 +4,14 @@
   <body>
     <main class="shell">
       <header><p class="eyebrow">TABBY</p><button id="settings" class="quiet">Settings</button></header>
-      <section id="card" class="card loading" aria-live="polite"><p>Finding an adoptable cat near you…</p></section>
+      <section id="card" class="card loading" aria-live="polite" hidden><p>Finding an adoptable cat near you…</p></section>
       <section id="location-panel" class="location-panel" hidden>
-        <h1>Find cats near you</h1><p>Allow location for the most accurate nearby results, or enter your ZIP code.</p>
-        <div class="actions"><button id="use-location">Use my location</button></div>
-        <form id="zip-form"><label for="zip">ZIP code</label><input id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="e.g. 33629" required><button type="submit">Save ZIP</button></form>
+        <h1>Find cats near you</h1>
+        <p>Use your location for the closest available cats.</p>
+        <div class="location-actions">
+          <button id="use-location" class="primary" type="button">Use my location</button>
+          <button id="open-settings" class="secondary" type="button">or enter your zip code</button>
+        </div>
       </section>
       <p id="notice" class="notice" role="status"></p>
     </main>
