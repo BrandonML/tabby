@@ -54,27 +54,32 @@ function renderCard(card, { stale = false } = {}) {
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
   const rescueUrl = normalizeUrl(card.rescueUrl || card.profileUrl);
   const profileUrl = normalizeUrl(card.profileUrl);
+  const rescueMarkup = rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`;
+  const profileMarkup = profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : "";
   $("card").className = "card";
   $("card").hidden = false;
-  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue">${escapeHtml(card.rescueName)}</p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
+  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueMarkup}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileMarkup}</div>`;
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
   $("card").querySelector("img").addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
 }
 
 function normalizeUrl(value) {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim().replace(/\s+/g, "");
-  if (!trimmed) return null;
-  if (/^https?:\/\/?$/i.test(trimmed)) return null;
-  if (/^https?:\/\//i.test(trimmed)) {
-    const fixed = trimmed.replace(/^https?:\/+(?!\/)/i, (match) => match.includes("//") ? match : `${match}/`);
-    return fixed.startsWith("http:/") && !fixed.startsWith("http://") ? fixed.replace(/^http:\//i, "http://") : fixed;
+  let candidate = value.trim().replace(/\s+/g, "");
+  if (!candidate) return null;
+  if (/^https?:\/\/?$/i.test(candidate)) return null;
+  if (/^http:\/+[^/]/i.test(candidate)) candidate = candidate.replace(/^http:\/+/, "http://");
+  if (/^https:\/+[^/]/i.test(candidate)) candidate = candidate.replace(/^https:\/+/, "https://");
+  if (candidate.startsWith("//")) candidate = `https:${candidate}`;
+  if (/^www\./i.test(candidate)) candidate = `https://${candidate}`;
+  if (!/^[a-z]+:\/\//i.test(candidate) && candidate.includes(".")) candidate = `https://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    if (!/^https?:$/.test(url.protocol)) return null;
+    return url.toString();
+  } catch {
+    return null;
   }
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  if (/^http:\//i.test(trimmed)) return trimmed.replace(/^http:\//i, "http://");
-  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
-  if (trimmed.includes(".") && !/^[a-z]+:\/\//i.test(trimmed)) return `https://${trimmed}`;
-  return null;
 }
 
 function escapeHtml(value = "") { const el = document.createElement("span"); el.textContent = value; return el.innerHTML; }
@@ -94,7 +99,8 @@ async function resolveLocation(settings, promptForLocation) {
 
 async function refresh(location, settings) {
   const { feedCache } = await storageGet(["feedCache"]);
-  const response = await fetch(`${settings.backendUrl.replace(/\/$/, "")}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }) });
+  const backendUrl = (settings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
+  const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
   const feed = await response.json();
   const seenIds = getSeenIds(feedCache);
@@ -117,6 +123,7 @@ async function refresh(location, settings) {
 async function start({ requestLocation = false } = {}) {
   setCardVisible(false);
   const { settings = { backendUrl: "http://localhost:8787", postalcode: "" }, feedCache } = await storageGet(["settings", "feedCache"]);
+  const resolvedSettings = { backendUrl: settings.backendUrl || "http://localhost:8787", postalcode: settings.postalcode || "" };
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   if (feedCache?.cards?.length && age < STALE_MS) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));
@@ -125,11 +132,11 @@ async function start({ requestLocation = false } = {}) {
   } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
     showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
   }
-  const location = await resolveLocation(settings, requestLocation);
+  const location = await resolveLocation(resolvedSettings, requestLocation);
   if (!location) { $("location-panel").hidden = false; return; }
   $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
-    try { await refresh(location, settings); } catch (error) {
+    try { await refresh(location, resolvedSettings); } catch (error) {
       const message = /five-digit|postal code|zip code|invalid/i.test(error.message) ? "That ZIP code looks invalid. Please update it." : error.message || "Unable to refresh nearby cats right now.";
       const finalMessage = /try updating your zip code|update it|zip code/i.test(message) ? message : `${message}${message.endsWith(".") ? "" : "."} Try updating your zip code.`;
       showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
