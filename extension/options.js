@@ -24,17 +24,23 @@ async function refreshCacheForZip(postalcode, nextSettings) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ location: { postalcode } })
     });
-    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Unable to refresh nearby cats.");
-    const feed = await response.json();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload.error || "Unable to refresh nearby cats right now.";
+      const invalid = /five-digit|postal code|zip code|invalid/i.test(message);
+      await chrome.storage.local.set({ settings: nextSettings, feedCache: null });
+      saved.textContent = invalid ? "That ZIP code looks invalid. Please update it." : "Unable to refresh nearby cats right now. Try updating your zip code.";
+      return;
+    }
     await chrome.storage.local.set({
       settings: nextSettings,
-      feedCache: { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, seenIds: [] }
+      feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, seenIds: [] }
     });
     saved.textContent = "Saved.";
     return;
   } catch (error) {
     await chrome.storage.local.set({ settings: nextSettings, feedCache: null });
-    saved.textContent = error.message;
+    saved.textContent = "Unable to refresh nearby cats right now. Try updating your zip code.";
     return;
   }
 }
@@ -47,7 +53,14 @@ chrome.storage.local.get(["settings"], ({ settings = {} }) => {
 });
 
 closeSettings.addEventListener("click", () => {
-  if (window.close) window.close();
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+    if (tab?.id) {
+      chrome.tabs.update(tab.id, { url: "chrome://new-tab-page/" });
+      return;
+    }
+    window.close();
+  });
 });
 
 form.addEventListener("submit", async (event) => {

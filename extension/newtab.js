@@ -5,6 +5,25 @@ const $ = (id) => document.getElementById(id);
 function storageGet(keys) { return chrome.storage.local.get(keys); }
 function storageSet(value) { return chrome.storage.local.set(value); }
 function randomCard(cards) { return cards[Math.floor(Math.random() * cards.length)]; }
+function setCardVisible(visible) {
+  const card = $("card");
+  if (!card) return;
+  card.hidden = !visible;
+}
+function showNotice(message, { linkText = null, linkAction = null } = {}) {
+  const notice = $("notice");
+  if (!notice) return;
+  if (linkText && linkAction) {
+    notice.innerHTML = `${escapeHtml(message)} <button type="button" class="notice-link" data-action="${escapeAttribute(linkAction)}">${escapeHtml(linkText)}</button>`;
+    const button = notice.querySelector("button[data-action]");
+    button?.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (linkAction === "open-settings") chrome.runtime.openOptionsPage();
+    });
+    return;
+  }
+  notice.textContent = message;
+}
 function readingFormat(value) {
   if (!value) return "";
   const updatedAt = new Date(value);
@@ -36,9 +55,10 @@ function renderCard(card, { stale = false } = {}) {
   const rescueUrl = normalizeUrl(card.rescueUrl || card.profileUrl);
   const profileUrl = normalizeUrl(card.profileUrl);
   $("card").className = "card";
+  $("card").hidden = false;
   $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : ""}</div>`;
-  $("notice").textContent = stale ? "Showing a recent saved match while we refresh." : "";
-  $("card").querySelector("img").addEventListener("error", () => { $("notice").textContent = "That photo is no longer available. Refresh to try another cat."; });
+  showNotice(stale ? "Showing a recent saved match while we refresh." : "");
+  $("card").querySelector("img").addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
 }
 
 function normalizeUrl(value) {
@@ -72,31 +92,45 @@ async function refresh(location, settings) {
   const response = await fetch(`${settings.backendUrl.replace(/\/$/, "")}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
   const feed = await response.json();
-  if (!feed.cards?.length) throw new Error("No photo-ready cats were found in the current search radius.");
   const seenIds = getSeenIds(feedCache);
-  const { selected, nextSeenIds } = nextCard(feed.cards, seenIds);
-  const nextCache = { cards: feed.cards, fetchedAt: Date.now(), radiusMiles: feed.radiusMiles, seenIds: nextSeenIds };
+  const nextCache = { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, seenIds };
   await storageSet({ feedCache: nextCache });
+  if (!feed.cards?.length) {
+    setCardVisible(false);
+    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
+    return;
+  }
+  const { selected, nextSeenIds } = nextCard(feed.cards, seenIds);
+  const finalCache = { ...nextCache, seenIds: nextSeenIds };
+  await storageSet({ feedCache: finalCache });
   renderCard(selected);
-  $("notice").textContent = `Showing results within ${feed.radiusMiles} miles.`;
+  showNotice(`Showing results within ${feed.radiusMiles} miles.`);
 }
 
 async function start({ requestLocation = false } = {}) {
+  setCardVisible(false);
   const { settings = { backendUrl: "http://localhost:8787", postalcode: "" }, feedCache } = await storageGet(["settings", "feedCache"]);
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   if (feedCache?.cards?.length && age < STALE_MS) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: age >= FRESH_MS });
+  } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
+    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
   }
   const location = await resolveLocation(settings, requestLocation);
-  if (!location) { $("location-panel").hidden = false; $("card").hidden = Boolean(feedCache?.cards?.length); return; }
+  if (!location) { $("location-panel").hidden = false; return; }
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
-    try { await refresh(location, settings); } catch (error) { $("notice").textContent = error.message; if (!feedCache?.cards?.length) $("location-panel").hidden = false; }
+    try { await refresh(location, settings); } catch (error) {
+      const message = /five-digit|postal code|zip code|invalid/i.test(error.message) ? "That ZIP code looks invalid. Please update it." : error.message || "Unable to refresh nearby cats right now.";
+      const finalMessage = /try updating your zip code|update it|zip code/i.test(message) ? message : `${message}${message.endsWith(".") ? "" : "."} Try updating your zip code.`;
+      showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
+      if (!feedCache?.cards?.length) $("location-panel").hidden = false;
+    }
   }
 }
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 $("use-location").addEventListener("click", () => start({ requestLocation: true }));
-$("zip-form").addEventListener("submit", async (event) => { event.preventDefault(); const postalcode = $("zip").value.trim(); if (!/^\d{5}$/.test(postalcode)) return; const { settings = {} } = await storageGet(["settings"]); const nextSettings = { ...settings, postalcode }; await storageSet({ settings: nextSettings, feedCache: null }); $("location-panel").hidden = true; await start(); });
+$("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 start();
