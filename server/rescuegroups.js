@@ -68,6 +68,7 @@ export function normalizeCards(payload) {
       profileUrl: attrs.url || org?.attributes?.url || null,
       profileUrlKind: attrs.url ? "animal" : org?.attributes?.url ? "organization" : null,
       rescueName: org?.attributes?.name || "Rescue organization",
+      rescueUrl: org?.attributes?.url || null,
       isAdoptionPending: Boolean(attrs.isAdoptionPending),
       isSpecialNeeds: Boolean(attrs.isSpecialNeeds),
       adoptionFee: attrs.adoptionFeeString || null,
