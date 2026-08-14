@@ -18,6 +18,8 @@ function updateBackendVisibility() {
 async function refreshCacheForZip(postalcode, nextSettings) {
   const backendUrl = (isLocalhost() ? backend.value.trim() : nextSettings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
   if (!/^\d{5}$/.test(postalcode)) return;
+  const safeSettings = { ...nextSettings };
+  delete safeSettings.location;
   try {
     const response = await fetch(`${backendUrl}/api/nearby-cats`, {
       method: "POST",
@@ -28,18 +30,18 @@ async function refreshCacheForZip(postalcode, nextSettings) {
     if (!response.ok) {
       const message = payload.error || "Unable to refresh nearby cats right now.";
       const invalid = /five-digit|postal code|zip code|invalid/i.test(message);
-      await chrome.storage.local.set({ settings: nextSettings, feedCache: null });
+      await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
       saved.textContent = invalid ? "That ZIP code looks invalid. Please update it." : "Unable to refresh nearby cats right now. Try updating your zip code.";
       return;
     }
     await chrome.storage.local.set({
-      settings: nextSettings,
+      settings: safeSettings,
       feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, seenIds: [] }
     });
     saved.textContent = "Saved.";
     return;
   } catch (error) {
-    await chrome.storage.local.set({ settings: nextSettings, feedCache: null });
+    await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
     saved.textContent = "Unable to refresh nearby cats right now. Try updating your zip code.";
     return;
   }
@@ -75,6 +77,7 @@ form.addEventListener("submit", async (event) => {
   }
   const { settings = {} } = await chrome.storage.local.get(["settings"]);
   const nextSettings = { ...settings, postalcode };
+  delete nextSettings.location;
   if (isLocalhost()) {
     nextSettings.backendUrl = backend.value.trim().replace(/\/$/, "") || "http://localhost:8787";
   }

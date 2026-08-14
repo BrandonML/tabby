@@ -30,7 +30,7 @@ function isRecentEnough(value) {
 const ANIMAL_FIELDS = [
   "name", "ageString", "sex", "distance", "url", "pictureCount",
   "pictureThumbnailUrl", "breedString", "descriptionText", "isSpecialNeeds",
-  "isAdoptionPending", "updatedDate", "adoptionFeeString"
+  "isAdoptionPending", "updatedDate", "updatedAt", "adoptionFeeString"
 ].join(",");
 
 export function validateLocation(input) {
@@ -80,7 +80,7 @@ export function normalizeCards(payload) {
     if (!picture) return null;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
-    const updatedAt = attrs.updatedDate || null;
+    const updatedAt = attrs.updatedDate || attrs.updatedAt || null;
     if (!isRecentEnough(updatedAt)) return null;
     const profileUrl = normalizeUrl(attrs.url || org?.attributes?.url || null);
     const rescueUrl = normalizeUrl(org?.attributes?.url || null);

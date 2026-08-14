@@ -91,8 +91,17 @@ async function locationFromBrowser() {
 }
 
 async function resolveLocation(settings, promptForLocation) {
+  const savedLocation = settings?.location;
+  if (savedLocation && Number.isFinite(savedLocation.lat) && Number.isFinite(savedLocation.lon)) {
+    return { lat: savedLocation.lat, lon: savedLocation.lon };
+  }
   if (promptForLocation) {
-    try { return await locationFromBrowser(); } catch { /* ZIP fallback below */ }
+    try {
+      const browserLocation = await locationFromBrowser();
+      const nextSettings = { ...settings, location: browserLocation };
+      await storageSet({ settings: nextSettings });
+      return browserLocation;
+    } catch { /* ZIP fallback below */ }
   }
   return /^\d{5}$/.test(settings.postalcode || "") ? { postalcode: settings.postalcode } : null;
 }
@@ -122,8 +131,12 @@ async function refresh(location, settings) {
 
 async function start({ requestLocation = false } = {}) {
   setCardVisible(false);
-  const { settings = { backendUrl: "http://localhost:8787", postalcode: "" }, feedCache } = await storageGet(["settings", "feedCache"]);
-  const resolvedSettings = { backendUrl: settings.backendUrl || "http://localhost:8787", postalcode: settings.postalcode || "" };
+  const { settings = { backendUrl: "http://localhost:8787", postalcode: "", location: null }, feedCache } = await storageGet(["settings", "feedCache"]);
+  const resolvedSettings = {
+    backendUrl: settings.backendUrl || "http://localhost:8787",
+    postalcode: settings.postalcode || "",
+    location: settings.location || null
+  };
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   if (feedCache?.cards?.length && age < STALE_MS) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));

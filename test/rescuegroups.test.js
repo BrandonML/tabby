@@ -55,6 +55,38 @@ test("normalizer drops stale cards and normalizes scheme-less rescue URLs", () =
   assert.equal(cards[0].rescueUrl, "https://www.freshrescue.test");
 });
 
+test("normalizer rejects cards with updatedDate older than one year", () => {
+  const oldDate = "2023-03-15T00:28:57Z";
+  const cards = normalizeCards({
+    data: [{
+      id: "old",
+      attributes: { name: "Oldie", updatedDate: oldDate, url: "www.example.com/oldie" },
+      relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } }
+    }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Old Rescue", url: "www.oldrescue.test" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/old.jpg" } } }
+    ]
+  });
+  assert.deepEqual(cards, []);
+});
+
+test("normalizer rejects stale cards when the API uses updatedAt instead of updatedDate", () => {
+  const oldDate = "2018-05-01T21:44:33Z";
+  const cards = normalizeCards({
+    data: [{
+      id: "oldat",
+      attributes: { name: "Oldie", updatedAt: oldDate, url: "www.example.com/oldie" },
+      relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } }
+    }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Old Rescue", url: "www.oldrescue.test" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/old.jpg" } } }
+    ]
+  });
+  assert.deepEqual(cards, []);
+});
+
 test("normalizer rejects placeholder and malformed http values", () => {
   const cards = normalizeCards({
     data: [{ id: "1", attributes: { name: "Milo", updatedDate: new Date().toISOString(), url: "http://", profileUrl: "http://" }, relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } } }],
