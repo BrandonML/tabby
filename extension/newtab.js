@@ -39,10 +39,12 @@ function getSeenIds(feedCache = {}) {
 }
 
 function nextCard(cards, seenIds = []) {
-  const unseenCards = cards.filter((card) => !seenIds.includes(card.id));
+  const seenSet = new Set(seenIds);
+  const unseenCards = cards.filter((card) => !seenSet.has(card.id));
   if (unseenCards.length) {
     const selected = randomCard(unseenCards);
-    return { selected, nextSeenIds: [...new Set([...seenIds, selected.id])] };
+    seenSet.add(selected.id);
+    return { selected, nextSeenIds: [...seenSet] };
   }
   return { selected: randomCard(cards), nextSeenIds: [] };
 }
