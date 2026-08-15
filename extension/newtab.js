@@ -58,7 +58,8 @@ function nextCard(cards, seenIds = []) {
     seenSet.add(selected.id);
     return { selected, nextSeenIds: [...seenSet] };
   }
-  return { selected: randomCard(cards), nextSeenIds: [] };
+  const selected = randomCard(cards);
+  return { selected, nextSeenIds: [selected.id] };
 }
 
 function renderCard(card, { stale = false } = {}) {
