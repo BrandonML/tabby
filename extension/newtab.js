@@ -176,7 +176,7 @@ async function resolveLocation(settings, promptForLocation) {
 async function refresh(location, settings) {
   const { feedCache } = await storageGet(["feedCache"]);
   const backendUrl = (settings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
-  const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }) });
+  const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }), signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
   const feed = await response.json();
   const seenIds = getSeenIds(feedCache);
