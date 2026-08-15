@@ -5,7 +5,7 @@ import { findNearbyCats, validateLocation } from "./rescuegroups.js";
 const port = Number(process.env.PORT || 8787);
 const allowedOrigin = process.env.ALLOW_ORIGIN || "*";
 
-if (!process.env.ALLOW_ORIGIN && process.env.NODE_ENV && process.env.NODE_ENV !== "development") {
+if (!process.env.ALLOW_ORIGIN && process.env.NODE_ENV !== "development") {
   console.warn("WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin before deploying.");
 }
 
