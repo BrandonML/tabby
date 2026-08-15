@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSearchRequest, normalizeCards, validateLocation } from "../server/rescuegroups.js";
+import { buildSearchRequest, normalizeCards, validateLocation, searchRadius } from "../server/rescuegroups.js";
 
 test("ZIP fallback uses RescueGroups native postalcode radius filter", () => {
   const request = buildSearchRequest({ postalcode: "33629" }, 10);
@@ -116,4 +116,72 @@ test("normalizer rejects placeholder and malformed http values", () => {
   assert.equal(cards.length, 1);
   assert.equal(cards[0].profileUrl, null);
   assert.equal(cards[0].rescueUrl, "http://www.robinhoodanimalrescue.org");
+});
+
+test("searchRadius throws error joining detail strings when payload has errors with detail", async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 400,
+    json: async () => ({
+      errors: [{ detail: "Invalid radius." }, { detail: "Invalid location." }]
+    })
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 400: Invalid radius.; Invalid location./
+  );
+});
+
+test("searchRadius throws error joining title strings when payload has errors with title but no detail", async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 401,
+    json: async () => ({
+      errors: [{ title: "Unauthorized access" }, { title: "Invalid token" }]
+    })
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 401: Unauthorized access; Invalid token/
+  );
+});
+
+test("searchRadius throws error joining mixed detail and title strings", async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 403,
+    json: async () => ({
+      errors: [{ detail: "Forbidden." }, { title: "Account locked" }]
+    })
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 403: Forbidden.; Account locked/
+  );
+});
+
+test("searchRadius throws error falling back to statusText when payload has no errors array", async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 500,
+    statusText: "Internal Server Error",
+    json: async () => ({ someOtherField: true })
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 500: Internal Server Error/
+  );
+});
+
+test("searchRadius throws error falling back to statusText when response is not valid JSON", async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 502,
+    statusText: "Bad Gateway",
+    json: async () => { throw new Error("Unexpected token < in JSON"); }
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 502: Bad Gateway/
+  );
 });
