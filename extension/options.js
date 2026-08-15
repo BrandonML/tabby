@@ -1,3 +1,5 @@
+import { classifyRefreshError } from "./error-messages.js";
+
 const form = document.getElementById("settings-form");
 const backend = document.getElementById("backend");
 const backendField = document.getElementById("backend-field");
@@ -20,9 +22,8 @@ async function refreshCacheForZip(postalcode, nextSettings) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = payload.error || "Unable to refresh nearby cats right now.";
-      const invalid = /five-digit|postal code|zip code|invalid/i.test(message);
       await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
-      saved.textContent = invalid ? "That ZIP code looks invalid. Please update it." : "Unable to refresh nearby cats right now. Try updating your zip code.";
+      saved.textContent = classifyRefreshError(message);
       return;
     }
     await chrome.storage.local.set({
