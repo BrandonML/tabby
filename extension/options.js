@@ -14,7 +14,8 @@ async function refreshCacheForZip(postalcode, nextSettings) {
     const response = await fetch(`${backendUrl}/api/nearby-cats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location: { postalcode } })
+      body: JSON.stringify({ location: { postalcode } }),
+      signal: AbortSignal.timeout(10_000)
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
