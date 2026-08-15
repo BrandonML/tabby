@@ -13,15 +13,27 @@ function setCardVisible(visible) {
 function showNotice(message, { linkText = null, linkAction = null } = {}) {
   const notice = $("notice");
   if (!notice) return;
+
+  notice.textContent = ""; // Clear existing content safely
+
   if (linkText && linkAction) {
-    notice.innerHTML = `${escapeHtml(message)} <button type="button" class="notice-link" data-action="${escapeAttribute(linkAction)}">${escapeHtml(linkText)}</button>`;
-    const button = notice.querySelector("button[data-action]");
-    button?.addEventListener("click", (event) => {
+    notice.appendChild(document.createTextNode(`${message} `));
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "notice-link";
+    button.dataset.action = linkAction;
+    button.textContent = linkText;
+
+    button.addEventListener("click", (event) => {
       event.preventDefault();
       if (linkAction === "open-settings") chrome.runtime.openOptionsPage();
     });
+
+    notice.appendChild(button);
     return;
   }
+
   notice.textContent = message;
 }
 function readingFormat(value) {
@@ -56,13 +68,87 @@ function renderCard(card, { stale = false } = {}) {
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
   const rescueUrl = normalizeUrl(card.rescueUrl || card.profileUrl);
   const profileUrl = normalizeUrl(card.profileUrl);
-  const rescueMarkup = rescueUrl ? `<p class="rescue"><a href="${escapeAttribute(rescueUrl)}" target="_blank" rel="noreferrer">${escapeHtml(card.rescueName)}</a></p>` : `<p class="rescue">${escapeHtml(card.rescueName)}</p>`;
-  const profileMarkup = profileUrl ? `<a class="profile" href="${escapeAttribute(profileUrl)}" target="_blank" rel="noreferrer">View profile</a>` : "";
-  $("card").className = "card";
-  $("card").hidden = false;
-  $("card").innerHTML = `<img class="photo" src="${card.imageUrl}" alt="${escapeHtml(card.name)}" referrerpolicy="no-referrer"><div class="content"><h1>${escapeHtml(card.name)}</h1>${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}${distance ? `<p class="distance">${escapeHtml(distance)}</p>` : ""}${updatedAt ? `<p class="updated">Updated ${escapeHtml(updatedAt)}</p>` : ""}${rescueMarkup}${chips.length ? `<div class="chips">${chips.map((chip) => `<span class="chip${chip.className ? ` ${chip.className}` : ""}">${escapeHtml(chip.label)}</span>`).join("")}</div>` : ""}${profileMarkup}</div>`;
+
+  const cardContainer = $("card");
+  cardContainer.className = "card";
+  cardContainer.hidden = false;
+  cardContainer.textContent = ""; // Clear securely
+
+  const img = document.createElement("img");
+  img.className = "photo";
+  img.src = card.imageUrl;
+  img.alt = card.name;
+  img.referrerPolicy = "no-referrer";
+  img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
+  cardContainer.appendChild(img);
+
+  const content = document.createElement("div");
+  content.className = "content";
+
+  const h1 = document.createElement("h1");
+  h1.textContent = card.name;
+  content.appendChild(h1);
+
+  if (meta) {
+    const metaP = document.createElement("p");
+    metaP.className = "meta";
+    metaP.textContent = meta;
+    content.appendChild(metaP);
+  }
+
+  if (distance) {
+    const distP = document.createElement("p");
+    distP.className = "distance";
+    distP.textContent = distance;
+    content.appendChild(distP);
+  }
+
+  if (updatedAt) {
+    const updatedP = document.createElement("p");
+    updatedP.className = "updated";
+    updatedP.textContent = `Updated ${updatedAt}`;
+    content.appendChild(updatedP);
+  }
+
+  const rescueP = document.createElement("p");
+  rescueP.className = "rescue";
+  if (rescueUrl) {
+    const rescueA = document.createElement("a");
+    rescueA.href = rescueUrl;
+    rescueA.target = "_blank";
+    rescueA.rel = "noreferrer";
+    rescueA.textContent = card.rescueName;
+    rescueP.appendChild(rescueA);
+  } else {
+    rescueP.textContent = card.rescueName;
+  }
+  content.appendChild(rescueP);
+
+  if (chips.length > 0) {
+    const chipsDiv = document.createElement("div");
+    chipsDiv.className = "chips";
+    for (const chip of chips) {
+      const chipSpan = document.createElement("span");
+      chipSpan.className = `chip${chip.className ? ` ${chip.className}` : ""}`;
+      chipSpan.textContent = chip.label;
+      chipsDiv.appendChild(chipSpan);
+    }
+    content.appendChild(chipsDiv);
+  }
+
+  if (profileUrl) {
+    const profileA = document.createElement("a");
+    profileA.className = "profile";
+    profileA.href = profileUrl;
+    profileA.target = "_blank";
+    profileA.rel = "noreferrer";
+    profileA.textContent = "View profile";
+    content.appendChild(profileA);
+  }
+
+  cardContainer.appendChild(content);
+
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
-  $("card").querySelector("img").addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
 }
 
 function normalizeUrl(value) {
@@ -83,9 +169,6 @@ function normalizeUrl(value) {
     return null;
   }
 }
-
-function escapeHtml(value = "") { return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
-function escapeAttribute(value = "") { return escapeHtml(value).replaceAll('"', "&quot;"); }
 
 async function locationFromBrowser() {
   const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 8000, maximumAge: 15 * 60 * 1000 }));
