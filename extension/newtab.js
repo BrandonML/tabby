@@ -82,7 +82,7 @@ function normalizeUrl(value) {
   }
 }
 
-function escapeHtml(value = "") { const el = document.createElement("span"); el.textContent = value; return el.innerHTML; }
+function escapeHtml(value = "") { return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
 function escapeAttribute(value = "") { return escapeHtml(value).replaceAll('"', "&quot;"); }
 
 async function locationFromBrowser() {
