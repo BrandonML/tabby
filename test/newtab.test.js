@@ -32,7 +32,10 @@ describe('newtab.js DOM manipulation', () => {
 
     // Inject the js
     const scriptEl = document.createElement('script');
-    scriptEl.textContent = jsContent;
+    scriptEl.textContent = jsContent.replace(
+      /import \{ classifyRefreshError \} from "\.\/error-messages\.js";/,
+      fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function')
+    );
     document.body.appendChild(scriptEl);
   });
 

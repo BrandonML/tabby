@@ -1,3 +1,5 @@
+import { classifyRefreshError } from "./error-messages.js";
+
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
 let inFlight = null;
@@ -186,7 +188,7 @@ async function refresh(location, settings) {
   if (!feed.cards?.length) {
     setCardVisible(false);
     $("location-panel").hidden = true;
-    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
+    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
     return;
   }
   const { selected, nextSeenIds } = nextCard(feed.cards, seenIds);
@@ -211,15 +213,14 @@ async function _start({ requestLocation = false } = {}) {
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: age >= FRESH_MS });
   } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
-    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different ${"zip code"} instead.`, { linkText: "zip code", linkAction: "open-settings" });
+    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
   if (!location) { $("location-panel").hidden = false; return; }
   $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
     try { await refresh(location, resolvedSettings); } catch (error) {
-      const message = /five-digit|postal code|zip code|invalid/i.test(error.message) ? "That ZIP code looks invalid. Please update it." : error.message || "Unable to refresh nearby cats right now.";
-      const finalMessage = /try updating your zip code|update it|zip code/i.test(message) ? message : `${message}${message.endsWith(".") ? "" : "."} Try updating your zip code.`;
+      const finalMessage = classifyRefreshError(error.message);
       showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
