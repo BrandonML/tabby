@@ -102,4 +102,43 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(chips[1].textContent, "Special needs");
     assert.equal(chips[2].textContent, "$50");
   });
+  it('nextCard selects unseen cards and updates seenIds correctly', () => {
+    const cards = [
+      { id: '1', name: 'Cat 1' },
+      { id: '2', name: 'Cat 2' },
+      { id: '3', name: 'Cat 3' }
+    ];
+
+    // 1. Normal unseen-pool selection
+    let { selected, nextSeenIds } = window.nextCard(cards, []);
+    assert.ok(['1', '2', '3'].includes(selected.id));
+    assert.deepEqual(nextSeenIds, [selected.id]);
+
+    let { selected: selected2, nextSeenIds: nextSeenIds2 } = window.nextCard(cards, nextSeenIds);
+    assert.ok(['1', '2', '3'].includes(selected2.id));
+    assert.notEqual(selected.id, selected2.id);
+    assert.equal(nextSeenIds2.length, 2);
+    assert.ok(nextSeenIds2.includes(selected.id));
+    assert.ok(nextSeenIds2.includes(selected2.id));
+
+    let { selected: selected3, nextSeenIds: nextSeenIds3 } = window.nextCard(cards, nextSeenIds2);
+    assert.ok(['1', '2', '3'].includes(selected3.id));
+    assert.notEqual(selected.id, selected3.id);
+    assert.notEqual(selected2.id, selected3.id);
+    assert.equal(nextSeenIds3.length, 3);
+    assert.ok(nextSeenIds3.includes(selected.id));
+    assert.ok(nextSeenIds3.includes(selected2.id));
+    assert.ok(nextSeenIds3.includes(selected3.id));
+
+    // 2. The reset case: all cards have been seen
+    // At this point, nextSeenIds3 has all ids.
+    let { selected: resetSelected, nextSeenIds: resetSeenIds } = window.nextCard(cards, nextSeenIds3);
+    assert.ok(['1', '2', '3'].includes(resetSelected.id));
+    assert.deepEqual(resetSeenIds, [resetSelected.id], "reset seenIds should only contain the newly selected id");
+
+    // Ensure the next card selected after reset is not the same as the reset card
+    let { selected: afterResetSelected, nextSeenIds: afterResetSeenIds } = window.nextCard(cards, resetSeenIds);
+    assert.notEqual(resetSelected.id, afterResetSelected.id, "selected card differs from what would repeat a stale id");
+    assert.deepEqual(afterResetSeenIds.sort(), [resetSelected.id, afterResetSelected.id].sort());
+  });
 });
