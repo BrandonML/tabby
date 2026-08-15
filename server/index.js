@@ -6,19 +6,30 @@ const allowedOrigin = process.env.ALLOW_ORIGIN || "*";
 const cache = new Map();
 const CACHE_MS = 3 * 60 * 1000;
 
-function send(response, status, body) {
+function send(response, status, body, extraHeaders = {}) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    "Access-Control-Allow-Headers": "Content-Type",
+    ...extraHeaders
   });
   response.end(JSON.stringify(body));
 }
 
 async function bodyOf(request) {
+  request.setTimeout(5000, () => request.destroy(new Error("Request timeout")));
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let totalLength = 0;
+  try {
+    for await (const chunk of request) {
+      totalLength += chunk.length;
+      if (totalLength > 16384) throw new Error("Payload too large");
+      chunks.push(chunk);
+    }
+  } finally {
+    request.setTimeout(0);
+  }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
@@ -28,7 +39,8 @@ function cacheKey(location) {
 
 createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {});
-  if (request.method !== "POST" || request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" });
+  if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" });
+  if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "POST" });
   try {
     const { location } = await bodyOf(request);
     const safeLocation = validateLocation(location);
@@ -39,7 +51,11 @@ createServer(async (request, response) => {
     cache.set(key, { createdAt: Date.now(), value });
     return send(response, 200, { ...value, cached: false });
   } catch (error) {
-    const status = /Provide a five-digit|location is required/.test(error.message) ? 400 : 502;
-    return send(response, status, { error: status === 400 ? error.message : "Unable to refresh nearby cats right now." });
+    let status = 502;
+    if (error.message === "Payload too large") status = 413;
+    else if (error.message === "Request timeout") status = 408;
+    else if (error instanceof SyntaxError || /Provide a five-digit|location is required/.test(error.message)) status = 400;
+
+    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." });
   }
 }).listen(port, () => console.log(`Tabby backend listening on http://localhost:${port}`));
