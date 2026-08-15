@@ -262,3 +262,46 @@ test("findNearbyCats returns empty and exhausted if no cats are found", async ()
   assert.equal(result.cards.length, 0);
   assert.deepEqual(calls, [10, 25, 50, 100]);
 });
+
+test("searchRadius throws error if apiKey is not provided", async () => {
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 10, {}),
+    /RG_API_KEY is not configured./
+  );
+});
+
+
+test("searchRadius returns normalized cards on successful response", async () => {
+  let fetchUrl;
+  let fetchOptions;
+  const mockPayload = createMockCards(2);
+
+  const fetchImpl = async (url, options) => {
+    fetchUrl = url;
+    fetchOptions = options;
+    return {
+      ok: true,
+      json: async () => mockPayload
+    };
+  };
+
+  const location = { postalcode: "33629" };
+  const apiKey = "test-api-key";
+  const miles = 25;
+  const cards = await searchRadius(location, miles, { apiKey, fetchImpl });
+
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].name, "Cat 0");
+  assert.equal(cards[1].name, "Cat 1");
+
+  assert.match(fetchUrl, /^https:\/\/api\.rescuegroups\.org\/v5\/public\/animals\/search\/available\/cats\/haspic\/\?/);
+
+  assert.equal(fetchOptions.method, "POST");
+  assert.equal(fetchOptions.headers.Authorization, apiKey);
+  assert.equal(fetchOptions.headers["Content-Type"], "application/vnd.api+json");
+  assert.equal(fetchOptions.headers.Accept, "application/vnd.api+json");
+  assert.ok(fetchOptions.signal instanceof AbortSignal);
+
+  const body = JSON.parse(fetchOptions.body);
+  assert.deepEqual(body, { data: { filterRadius: { postalcode: "33629", miles: 25 } } });
+});
