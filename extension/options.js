@@ -5,18 +5,8 @@ const zip = document.getElementById("zip");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
 
-function isLocalhost() {
-  const hostname = window.location.hostname;
-  return ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
-}
-
-function updateBackendVisibility() {
-  const visible = isLocalhost();
-  if (backendField) backendField.hidden = !visible;
-}
-
 async function refreshCacheForZip(postalcode, nextSettings) {
-  const backendUrl = (isLocalhost() ? backend.value.trim() : nextSettings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
+  const backendUrl = (nextSettings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
   if (!/^\d{5}$/.test(postalcode)) return;
   const safeSettings = { ...nextSettings };
   delete safeSettings.location;
@@ -51,7 +41,6 @@ chrome.storage.local.get(["settings"], ({ settings = {} }) => {
   const savedSettings = settings || {};
   backend.value = savedSettings.backendUrl || "http://localhost:8787";
   zip.value = savedSettings.postalcode || "";
-  updateBackendVisibility();
 });
 
 closeSettings.addEventListener("click", () => {
@@ -78,8 +67,7 @@ form.addEventListener("submit", async (event) => {
   const { settings = {} } = await chrome.storage.local.get(["settings"]);
   const nextSettings = { ...settings, postalcode };
   delete nextSettings.location;
-  if (isLocalhost()) {
-    nextSettings.backendUrl = backend.value.trim().replace(/\/$/, "") || "http://localhost:8787";
-  }
+  nextSettings.backendUrl = backend.value.trim().replace(/\/$/, "") || "http://localhost:8787";
+
   await refreshCacheForZip(postalcode, nextSettings);
 });
