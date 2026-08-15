@@ -1,5 +1,6 @@
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
+let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
 function storageGet(keys) { return chrome.storage.local.get(keys); }
@@ -196,7 +197,7 @@ async function refresh(location, settings) {
   showNotice(`Showing results within ${feed.radiusMiles} miles.`);
 }
 
-async function start({ requestLocation = false } = {}) {
+async function _start({ requestLocation = false } = {}) {
   setCardVisible(false);
   const { settings = { backendUrl: "http://localhost:8787", postalcode: "", location: null }, feedCache } = await storageGet(["settings", "feedCache"]);
   const resolvedSettings = {
@@ -223,6 +224,12 @@ async function start({ requestLocation = false } = {}) {
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }
+}
+
+function start(options = {}) {
+  if (inFlight) return inFlight;
+  inFlight = _start(options).finally(() => { inFlight = null; });
+  return inFlight;
 }
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
