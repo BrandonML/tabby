@@ -144,4 +144,183 @@ describe('newtab.js DOM manipulation', () => {
     assert.notEqual(resetSelected.id, afterResetSelected.id, "selected card differs from what would repeat a stale id");
     assert.deepEqual(afterResetSeenIds.sort(), [resetSelected.id, afterResetSelected.id].sort());
   });
+
+  describe('resolveLocation', () => {
+    it('returns saved location if valid', async () => {
+      const result = await window.resolveLocation({ location: { lat: 10, lon: 20 } }, true);
+      assert.deepEqual(result, { lat: 10, lon: 20 });
+    });
+
+    it('prompts browser if requested and no saved location', async () => {
+      window.navigator.geolocation = {
+        getCurrentPosition: (success) => success({ coords: { latitude: 30, longitude: 40 } })
+      };
+      let savedSettings;
+      window.chrome.storage.local.set = async (val) => { savedSettings = val; };
+
+      const result = await window.resolveLocation({}, true);
+      assert.deepEqual(result, { lat: 30, lon: 40 });
+      assert.deepEqual(savedSettings, { settings: { location: { lat: 30, lon: 40 } } });
+    });
+
+    it('falls back to ZIP if prompt fails', async () => {
+      window.navigator.geolocation = {
+        getCurrentPosition: (success, error) => error(new Error("denied"))
+      };
+      const result = await window.resolveLocation({ postalcode: '12345' }, true);
+      assert.deepEqual(result, { postalcode: '12345' });
+    });
+
+    it('falls back to ZIP if not prompting and no saved location', async () => {
+      const result = await window.resolveLocation({ postalcode: '12345' }, false);
+      assert.deepEqual(result, { postalcode: '12345' });
+    });
+
+    it('returns null if no location can be resolved', async () => {
+      const result = await window.resolveLocation({}, false);
+      assert.strictEqual(result, null);
+    });
+  });
+
+  describe('refresh', () => {
+    beforeEach(() => {
+      window.chrome.storage.local.get = async () => ({ feedCache: {} });
+    });
+
+    it('updates cache and renders card on success', async () => {
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => {
+        if (val.feedCache) savedCache = val.feedCache;
+      };
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({
+          cards: [{ id: '1', name: 'Cat1' }],
+          radiusMiles: 10
+        })
+      });
+
+      await window.refresh({ postalcode: '12345' }, {});
+      assert.ok(savedCache);
+      assert.equal(savedCache.cards.length, 1);
+      assert.equal(savedCache.radiusMiles, 10);
+      assert.deepEqual(savedCache.seenIds, ['1']);
+
+      const card = document.getElementById("card");
+      assert.equal(card.hidden, false);
+      assert.equal(card.querySelector('h1').textContent, 'Cat1');
+    });
+
+    it('shows notice and hides card on empty results', async () => {
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [], radiusMiles: 5 })
+      });
+
+      await window.refresh({ postalcode: '12345' }, {});
+      const card = document.getElementById("card");
+      const notice = document.getElementById("notice");
+      assert.equal(card.hidden, true);
+      assert.ok(notice.textContent.includes('No available cats'));
+    });
+
+    it('throws error on failure', async () => {
+      window.fetch = async () => ({
+        ok: false,
+        json: async () => ({ error: "Server error" })
+      });
+
+      try {
+        await window.refresh({ postalcode: '12345' }, {});
+        assert.fail('should have thrown');
+      } catch (e) {
+        assert.equal(e.message, "Server error");
+      }
+    });
+  });
+
+  describe('start', () => {
+    let mockStart;
+
+    beforeEach(() => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { backendUrl: 'http://test', postalcode: '12345' },
+        feedCache: null
+      });
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 10 })
+      });
+    });
+
+    it('handles fresh cache', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { backendUrl: 'http://test', postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1' }],
+          fetchedAt: Date.now() - (1000 * 60), // 1 min old (fresh)
+          seenIds: []
+        }
+      });
+
+      let fetchCalled = false;
+      window.fetch = async () => { fetchCalled = true; };
+
+      await window.start();
+
+      assert.equal(fetchCalled, false);
+      const card = document.getElementById("card");
+      assert.equal(card.hidden, false);
+      assert.equal(card.querySelector('h1').textContent, 'Cat1');
+    });
+
+    it('handles stale-while-revalidate', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { backendUrl: 'http://test', postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: '1', name: 'CatStale' }],
+          fetchedAt: Date.now() - (1000 * 60 * 10), // 10 mins old (stale but valid)
+          seenIds: []
+        }
+      });
+
+      let fetchCalled = false;
+      window.fetch = async () => {
+        fetchCalled = true;
+        return {
+          ok: true,
+          json: async () => ({ cards: [{ id: '2', name: 'CatFresh' }], radiusMiles: 10 })
+        };
+      };
+
+      // We await the returned promise from start()
+      await window.start();
+
+      assert.equal(fetchCalled, true);
+      const card = document.getElementById("card");
+      assert.equal(card.hidden, false);
+      // Because we awaited start(), refresh has finished and we see the fresh cat.
+      // (Wait, actually in _start the stale card is rendered *first*, then refresh is awaited and renders the fresh one.)
+      assert.equal(card.querySelector('h1').textContent, 'CatFresh');
+    });
+
+    it('shows no-location panel if no location', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: {}, feedCache: null
+      });
+
+      await window.start();
+
+      const locPanel = document.getElementById("location-panel");
+      assert.equal(locPanel.hidden, false);
+    });
+
+    it('prevents multiple concurrent executions', async () => {
+      const p1 = window.start();
+      const p2 = window.start();
+
+      assert.strictEqual(p1, p2, "start() should return the same promise if one is in flight");
+      await p1;
+    });
+  });
 });
