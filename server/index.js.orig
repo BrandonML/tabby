@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { fileURLToPath } from "node:url";
 import { findNearbyCats, validateLocation } from "./rescuegroups.js";
 
 const port = Number(process.env.PORT || 8787);
@@ -73,6 +72,6 @@ export const server = createServer(async (request, response) => {
   }
 });
 
-if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && process.argv[1] === new URL(import.meta.url).pathname) {
   server.listen(port, () => console.log(`Tabby backend listening on http://localhost:${port}`));
 }
