@@ -67,8 +67,8 @@ function renderCard(card, { stale = false } = {}) {
   const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away` : null;
   const updatedAt = readingFormat(card.updatedAt);
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
-  const rescueUrl = normalizeUrl(card.rescueUrl || card.profileUrl);
-  const profileUrl = normalizeUrl(card.profileUrl);
+  const rescueUrl = card.rescueUrl || card.profileUrl;
+  const profileUrl = card.profileUrl;
 
   const cardContainer = $("card");
   cardContainer.className = "card";
@@ -150,25 +150,6 @@ function renderCard(card, { stale = false } = {}) {
   cardContainer.appendChild(content);
 
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
-}
-
-function normalizeUrl(value) {
-  if (typeof value !== "string") return null;
-  let candidate = value.trim().replace(/\s+/g, "");
-  if (!candidate) return null;
-  if (/^https?:\/\/?$/i.test(candidate)) return null;
-  if (/^http:\/+[^/]/i.test(candidate)) candidate = candidate.replace(/^http:\/+/, "http://");
-  if (/^https:\/+[^/]/i.test(candidate)) candidate = candidate.replace(/^https:\/+/, "https://");
-  if (candidate.startsWith("//")) candidate = `https:${candidate}`;
-  if (/^www\./i.test(candidate)) candidate = `https://${candidate}`;
-  if (!/^[a-z]+:\/\//i.test(candidate) && candidate.includes(".")) candidate = `https://${candidate}`;
-  try {
-    const url = new URL(candidate);
-    if (!/^https?:$/.test(url.protocol)) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
 }
 
 async function locationFromBrowser() {
