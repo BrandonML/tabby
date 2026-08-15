@@ -35,7 +35,9 @@ async function bodyOf(request) {
       chunks.push(chunk);
     }
   } finally {
-    request.setTimeout(0);
+    if (request.socket) {
+      request.setTimeout(0);
+    }
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }

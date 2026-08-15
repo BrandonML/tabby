@@ -89,3 +89,154 @@ describe("server cache", () => {
     assert.strictEqual(cache.has("zip:10006"), true);
   });
 });
+
+describe("server routing and behavior", () => {
+  let port;
+
+  beforeEach(async () => {
+    cache.clear();
+    await new Promise((resolve) => server.listen(0, resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    mock.restoreAll();
+  });
+
+  const request = (options, body = null) => {
+    return new Promise((resolve, reject) => {
+      const req = http.request({ ...options, hostname: 'localhost', port }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve({ res, data }));
+      });
+      req.on('error', reject);
+      if (body !== null) {
+        req.write(body);
+      }
+      req.end();
+    });
+  };
+
+  it("POST /api/nearby-cats with valid body returns 200 with expected shape and CORS headers", async () => {
+    process.env.RG_API_KEY = "test-key";
+    mock.method(global, 'fetch', async () => ({
+      ok: true,
+      json: async () => ({ data: [], included: [] })
+    }));
+
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "12345" } })
+    );
+
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.headers["access-control-allow-origin"], "*");
+    assert.strictEqual(res.headers["access-control-allow-methods"], "POST, OPTIONS");
+    assert.strictEqual(res.headers["access-control-allow-headers"], "Content-Type");
+
+    const body = JSON.parse(data);
+    assert.strictEqual(body.cached, false);
+    assert.deepStrictEqual(body.cards, []);
+  });
+
+  it("A second identical request within CACHE_MS returns the cached result (cached: true)", async () => {
+    process.env.RG_API_KEY = "test-key";
+    let fetchCalls = 0;
+    mock.method(global, 'fetch', async () => {
+      fetchCalls++;
+      return {
+        ok: true,
+        json: async () => ({ data: [], included: [] })
+      };
+    });
+
+    const bodyStr = JSON.stringify({ location: { postalcode: "12345" } });
+
+    // First request
+    const req1 = await request({ path: '/api/nearby-cats', method: 'POST' }, bodyStr);
+    assert.strictEqual(req1.res.statusCode, 200);
+    const body1 = JSON.parse(req1.data);
+    assert.strictEqual(body1.cached, false);
+    assert.strictEqual(fetchCalls, 4); // RADIUS_STEPS triggers 4 fetches if no results
+
+    // Second request
+    const req2 = await request({ path: '/api/nearby-cats', method: 'POST' }, bodyStr);
+    assert.strictEqual(req2.res.statusCode, 200);
+    const body2 = JSON.parse(req2.data);
+    assert.strictEqual(body2.cached, true);
+    assert.strictEqual(fetchCalls, 4); // Still 4 fetches
+  });
+
+  it("OPTIONS returns 204 with the correct CORS headers", async () => {
+    const { res, data } = await request({ path: '/api/nearby-cats', method: 'OPTIONS' });
+    assert.strictEqual(res.statusCode, 204);
+    assert.strictEqual(res.headers["access-control-allow-origin"], "*");
+    assert.strictEqual(res.headers["access-control-allow-methods"], "POST, OPTIONS");
+    assert.strictEqual(res.headers["access-control-allow-headers"], "Content-Type");
+    assert.strictEqual(data, ""); // 204 should have no body
+  });
+
+  it("GET /api/nearby-cats returns 405 with an Allow header", async () => {
+    const { res, data } = await request({ path: '/api/nearby-cats', method: 'GET' });
+    assert.strictEqual(res.statusCode, 405);
+    assert.strictEqual(res.headers["allow"], "POST");
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Method Not Allowed");
+  });
+
+  it("An unknown path returns 404", async () => {
+    const { res, data } = await request({ path: '/api/unknown', method: 'POST' });
+    assert.strictEqual(res.statusCode, 404);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Not found");
+  });
+
+  it("An oversized body is rejected (413) without hanging", async () => {
+    const bigBody = "x".repeat(16385);
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      bigBody
+    );
+    assert.strictEqual(res.statusCode, 413);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Payload too large");
+  });
+
+  it("Malformed JSON body returns 400, not 502", async () => {
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      "{ location: "
+    );
+    assert.strictEqual(res.statusCode, 400);
+    const body = JSON.parse(data);
+    assert.match(body.error, /Expected property name or '}'/);
+  });
+
+  it("A location that fails validateLocation() returns 400 with the validation message", async () => {
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "123" } }) // Invalid length
+    );
+    assert.strictEqual(res.statusCode, 400);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Provide a five-digit postal code or valid latitude and longitude.");
+  });
+
+  it("Mock findNearbyCats failing returns 502 with the generic error message", async () => {
+    process.env.RG_API_KEY = "test-key";
+    mock.method(global, 'fetch', async () => {
+      throw new Error("Raw upstream crash");
+    });
+
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "12345" } })
+    );
+
+    assert.strictEqual(res.statusCode, 502);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Unable to refresh nearby cats right now.");
+  });
+});
