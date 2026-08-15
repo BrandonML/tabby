@@ -6,5 +6,8 @@
   "scripts": {
     "test": "node --test test/**/*.test.js",
     "start:server": "node server/index.js"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
   }
 }
