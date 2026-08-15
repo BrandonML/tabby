@@ -88,7 +88,15 @@ export function normalizeCards(payload) {
     const relationships = animal.relationships || {};
     const pictures = relationshipResources(relationships.pictures, "pictures", index)
       .sort((a, b) => (a.attributes?.order ?? Number.MAX_SAFE_INTEGER) - (b.attributes?.order ?? Number.MAX_SAFE_INTEGER));
-    const picture = pictures.map((item) => item.attributes || {}).find((item) => item.large?.url || item.original?.url);
+    let picture, imageUrl;
+    for (const item of pictures.map((p) => p.attributes || {})) {
+      const rawImg = item.large?.url || item.original?.url;
+      imageUrl = normalizeUrl(rawImg);
+      if (imageUrl) {
+        picture = item;
+        break;
+      }
+    }
     if (!picture) return null;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
@@ -103,8 +111,8 @@ export function normalizeCards(payload) {
       sex: attrs.sex || null,
       breed: attrs.breedString || null,
       distanceMiles: Number.isFinite(attrs.distance) ? attrs.distance : null,
-      imageUrl: picture.large?.url || picture.original?.url,
-      originalImageUrl: picture.original?.url || null,
+      imageUrl,
+      originalImageUrl: normalizeUrl(picture.original?.url),
       profileUrl,
       profileUrlKind: attrs.url ? "animal" : org?.attributes?.url ? "organization" : null,
       rescueName: org?.attributes?.name || "Rescue organization",

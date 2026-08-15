@@ -118,6 +118,24 @@ test("normalizer rejects placeholder and malformed http values", () => {
   assert.equal(cards[0].rescueUrl, "http://www.robinhoodanimalrescue.org");
 });
 
+test("normalizer rejects cards with malformed or unsafe imageUrl", () => {
+  const cards = normalizeCards({
+    data: [{
+      id: "malformed-img",
+      attributes: { name: "Hacker Cat", updatedDate: new Date().toISOString() },
+      relationships: {
+        orgs: { data: [{ id: "o", type: "orgs" }] },
+        pictures: { data: [{ id: "p1", type: "pictures" }] }
+      }
+    }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Rescue" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "javascript:alert(1)" } } }
+    ]
+  });
+  assert.deepEqual(cards, []);
+});
+
 test("searchRadius throws error joining detail strings when payload has errors with detail", async () => {
   const fetchImpl = async () => ({
     ok: false,
