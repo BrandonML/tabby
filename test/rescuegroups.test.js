@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSearchRequest, normalizeCards, validateLocation, searchRadius } from "../server/rescuegroups.js";
+import { buildSearchRequest, normalizeCards, validateLocation, searchRadius, findNearbyCats } from "../server/rescuegroups.js";
 
 test("ZIP fallback uses RescueGroups native postalcode radius filter", () => {
   const request = buildSearchRequest({ postalcode: "33629" }, 10);
@@ -184,4 +184,81 @@ test("searchRadius throws error falling back to statusText when response is not 
     searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 502: Bad Gateway/
   );
+});
+
+function createMockCards(count) {
+  const data = [];
+  for (let i = 0; i < count; i++) {
+    data.push({
+      id: String(i),
+      attributes: {
+        name: `Cat ${i}`,
+        distance: 5.0,
+        url: `https://rescue.test/cat${i}`,
+        updatedDate: new Date().toISOString()
+      },
+      relationships: {
+        orgs: { data: [{ id: "o", type: "orgs" }] },
+        pictures: { data: [{ id: "p1", type: "pictures" }] }
+      }
+    });
+  }
+  return {
+    data,
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Local Rescue", url: "https://rescue.test" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/first.jpg" } } }
+    ]
+  };
+}
+
+function createFetchImpl(responsesByMiles) {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    const miles = body.data.filterRadius.miles;
+    calls.push(miles);
+    const count = responsesByMiles[miles] || 0;
+    return {
+      ok: true,
+      json: async () => createMockCards(count)
+    };
+  };
+  return { fetchImpl, calls };
+}
+
+test("findNearbyCats stops at first radius if target is reached", async () => {
+  const { fetchImpl, calls } = createFetchImpl({ 10: 10 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  assert.equal(result.exhausted, false);
+  assert.equal(result.radiusMiles, 10);
+  assert.equal(result.cards.length, 10);
+  assert.deepEqual(calls, [10]);
+});
+
+test("findNearbyCats escalates radius until target is reached", async () => {
+  const { fetchImpl, calls } = createFetchImpl({ 10: 2, 25: 5, 50: 9 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  assert.equal(result.exhausted, false);
+  assert.equal(result.radiusMiles, 50);
+  assert.equal(result.cards.length, 9);
+  assert.deepEqual(calls, [10, 25, 50]);
+});
+
+test("findNearbyCats exhausts all radii if target is never reached but finds some cats", async () => {
+  const { fetchImpl, calls } = createFetchImpl({ 10: 2, 25: 3, 50: 4, 100: 5 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  assert.equal(result.exhausted, true);
+  assert.equal(result.radiusMiles, 100);
+  assert.equal(result.cards.length, 5);
+  assert.deepEqual(calls, [10, 25, 50, 100]);
+});
+
+test("findNearbyCats returns empty and exhausted if no cats are found", async () => {
+  const { fetchImpl, calls } = createFetchImpl({});
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  assert.equal(result.exhausted, true);
+  assert.equal(result.radiusMiles, 100);
+  assert.equal(result.cards.length, 0);
+  assert.deepEqual(calls, [10, 25, 50, 100]);
 });
