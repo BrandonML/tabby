@@ -234,24 +234,60 @@ fallback) and for the auto-navigate-after-save behavior (assert `chrome.tabs.cre
 
 ---
 
-## Task 8 — Unseen-aware re-caching, pagination, and multi-rescue variation
+## Task 8 — Unseen-aware re-caching and pagination
 
-**Issue:** Three related gaps, all in `server/rescuegroups.js` / `server/index.js`:
+> Revised 2026-08-17 after Task 7's live-API findings and a design discussion. The
+> pagination contract below is confirmed (not assumed), and the original "raise the
+> request size, then shuffle-and-truncate down to a smaller cached size" plan has been
+> dropped in favor of caching everything a single request returns — see rationale inline.
+
+**Issue:** Two related gaps, both in `server/rescuegroups.js` / `server/index.js`:
 (1) re-cache timing is purely time-based (`FRESH_MS`/`STALE_MS` in `newtab.js`) with no
 signal for "has the user actually seen most of what's cached"; (2) a repeat server call
 for the same location returns the identical nearest-25 set every time, since
 `buildSearchRequest` always requests the same unpaginated page sorted by distance —
 `seenIds` in client storage only prevents repeats *within* one cached batch, not across
-refreshes; (3) results aren't shuffled across rescues, so cached batches often come from
-a single dense-nearby organization.
+refreshes.
+>
+> A third original gap — "results aren't shuffled across rescues, so cached batches often
+> come from a single dense-nearby organization" — no longer needs separate handling. That
+> risk only existed because the original plan fetched a larger batch and then *truncated*
+> it down to a small cached size, and a naive truncation of a distance-sorted list could
+> cut off smaller orgs entirely. Dropping the truncation (below) removes the risk at the
+> source: nothing gets cut, so no org can be disproportionately excluded. Per-card display
+> order was already random regardless (`nextCard()` in `newtab.js` picks uniformly at
+> random from whatever's unseen), so array order never needed active shuffling either.
 
 **Expected outcome:**
 - The client only triggers a background refresh when the cache is stale by time **and**
   at least half of the cached cards are in `seenIds` — not on time alone.
 - A refresh for an unchanged location returns cats the user hasn't already seen, where
   the API has more available (via pagination), instead of re-serving the same 25.
-- A single cached batch is a randomized sample across rescues rather than nearest-first
-  same-org clustering.
+- Each fetch pulls a much larger batch (see limit below) and caches all of it, not just a
+  truncated subset — directly reducing how often a re-fetch is needed at all, which is
+  the actual objective (fewer API calls, more cats available locally per call).
+
+**Confirmed RescueGroups pagination/limit contract** (from Task 7's live test and the RG
+API docs — no longer an assumption):
+- `page` is a **plain scalar** query param (e.g. `page=2`), *not* JSON:API-style
+  `page[number]`/`page[size]` — RescueGroups rejects bracket params with HTTP 400
+  ("Arrayis an invalid page."), because their query-string parser turns bracket params
+  into an array for `page` and their validation rejects an array there.
+- `limit` continues to control page size, sent alongside `page`.
+- A page beyond available results returns **HTTP 200 with an empty `data` array** — not
+  an error, not wrapped-around results — and the response's `meta` includes `count`
+  (total matching), `countReturned`, `pageReturned`, and `pages` (total page count).
+  `findNearbyCats`'s escalation logic can check `meta.pages`/`meta.count` directly to
+  know when it's exhausted the API instead of inferring it from an empty array alone.
+- Per RG's docs: `limit`'s max is **250** for this endpoint ("A value that is non-numeric,
+  negative, or higher than the max limit for the endpoint will result in a 400 error
+  response"). Raise `MAX_LIMIT` from 25 to **100** — well above the old value (meaningfully
+  reduces refresh frequency and page count for a given search) without pushing into the
+  higher end of the range, which risks larger payloads, longer request latency against
+  the existing 8s `AbortSignal.timeout`, and a bigger per-entry footprint in the server's
+  in-memory cache (still bounded overall by the existing `MAX_CACHE_SIZE = 500` entries —
+  a real but acceptable tradeoff, not a blocker). No separate request-size vs.
+  cached/output-size split — one `MAX_LIMIT`, used for both, nothing truncated after.
 
 **Implementation specifics:**
 - **Client gate** (`extension/newtab.js`): in `_start()`, change the refresh condition
@@ -261,9 +297,8 @@ a single dense-nearby organization.
   seen-ratio, so a stale-for-30-min cache always refreshes even if the user barely looked
   at it.
 - **Pagination** (`server/rescuegroups.js`): add a `page` parameter to
-  `buildSearchRequest(location, miles, page = 1)`, passed as `page[number]` in the query
-  params (confirm exact RescueGroups v5 param name against their docs — it's
-  JSON:API-style pagination, likely `page[number]`/`page[size]`). Thread `page` through
+  `buildSearchRequest(location, miles, page = 1)`, sent as a plain scalar `page` query
+  param (see confirmed contract above), not bracket-style. Thread `page` through
   `searchRadius` and `findNearbyCats`. The client should send its current `seenIds`
   (or simply a `page` counter stored alongside `feedCache`) to `/api/nearby-cats` in the
   POST body; `server/index.js`'s handler reads that and passes it to `findNearbyCats`.
@@ -274,20 +309,19 @@ a single dense-nearby organization.
   the 3-minute server cache would return the same page regardless of the client's
   pagination request. Extend `cacheKey()` to include the page number so distinct pages
   cache independently.
-- **Multi-rescue shuffle** (`server/rescuegroups.js`): raise the requested `limit` in
-  `buildSearchRequest` (e.g. to 75–100) instead of `MAX_LIMIT = 25`, then in
-  `normalizeCards` or a new post-processing step in `findNearbyCats`, group normalized
-  cards by `rescueName`/org id and interleave (round-robin) before truncating to the
-  actual batch size you want to store (keep `MAX_LIMIT` as the *output* size, not the
-  request size — rename accordingly, e.g. `REQUEST_LIMIT` vs `OUTPUT_LIMIT`).
+- **Raise the request/cache size** (`server/rescuegroups.js`): change `MAX_LIMIT` from
+  `25` to `100`. No truncation step, no interleave/shuffle step — cache whatever
+  `normalizeCards` returns from the single request, in full (see rationale above).
 
-**Testing required:** Tier 3 (core caching/API logic). This is the largest change in the
-backlog — expect to touch most of `rescuegroups.test.js` (pagination param assertions,
-shuffle/grouping assertions) and `server.test.js` (cache-key-with-page assertions), plus
+**Testing required:** Tier 3 (core caching/API logic). Expect to touch most of
+`rescuegroups.test.js` (pagination param assertions using the confirmed scalar `page`
+shape, `MAX_LIMIT` value) and `server.test.js` (cache-key-with-page assertions), plus
 `newtab.test.js`'s `_start` refresh-trigger tests (seen-ratio gating). Run full suite.
-Also manually verify against the live RescueGroups API (not just mocks) that the
-pagination parameter name is correct before merging — the JSON:API spec name should be
-confirmed against RescueGroups v5 docs since it's not covered by existing tests.
+`test-live/rescuegroups.live.js` already exercises `buildSearchRequest` directly, so
+running `npm run test:live` once after this change is a free sanity check that
+`limit=100` behaves against the real API — not strictly required (the docs already
+confirm 100 is well under the 250 ceiling), but cheap reassurance given it's a one-line
+`npm run` away.
 
 ---
 
