@@ -66,12 +66,32 @@ Tabby consists of two distinct environments. Scope your changes strictly to the 
 
 ## 4. Testing & QA
 
-Run tests via the `/test` directory. 
+Run tests via the `/test` directory.
 
-| Change Type | Required Testing[cite: 2] |
-|---|---|
-| Server logic / API calls | Unit tests (e.g., `rescuegroups.test.js`) |
-| UI or user-facing flow | Manual end-to-end QA |
+Use the following tiers to scope how much testing a change needs. An agent's own
+judgment that a change is "probably fine to skip" is **not** sufficient — only the
+Tier 1 allowlist below qualifies for a skip; everything else falls to Tier 2 or Tier 3.
+
+- **Tier 1 — Test-exempt** (no test run required): changes limited to `README.md`,
+  `AGENTS.md`, code comments, `.gitignore`, or files under `/test` that only add or
+  modify test cases (not source files).
+- **Tier 2 — Narrow impact** (run only the directly affected test file(s)): a change
+  confined to a single function or a single file with no changes to its exported
+  signatures or call sites elsewhere. Example: editing `showNotice()`'s copy runs only
+  `newtab.test.js`, not the full suite.
+- **Tier 3 — Full suite required**: anything touching exported function signatures,
+  `server/`, shared state shape (`feedCache`, `settings`), manifest permissions, or any
+  `release/` branch. Full suite is **always** required before a version bump or release
+  task regardless of what Tier 1/2 would otherwise allow.
+
+### Manual QA Checklist
+
+For any UI-affecting change, perform at minimum:
+
+1. Load the unpacked extension in `chrome://extensions`.
+2. Open a new tab and confirm cards render.
+3. Open Settings and confirm the save/close flow works.
+4. Confirm there are no console errors in the service worker or new-tab page devtools.
 
 ### Error Recovery
 1. Stop at the point of failure; do not silently continue[cite: 2].
