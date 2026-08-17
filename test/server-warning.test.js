@@ -1,9 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
-const serverModulePath = fileURLToPath(new URL("../server/index.js", import.meta.url));
+// A file:// URL (not a bare filesystem path) so the child process's dynamic
+// import() works on Windows too — a raw "C:\..." path throws
+// ERR_UNSUPPORTED_ESM_URL_SCHEME there.
+const serverModuleUrl = new URL("../server/index.js", import.meta.url).href;
 const warningMessage = "WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin before deploying.";
 
 function checkWarning(envOverrides) {
@@ -14,7 +16,7 @@ function checkWarning(envOverrides) {
   if (envOverrides.ALLOW_ORIGIN === undefined) delete env.ALLOW_ORIGIN;
   if (envOverrides.NODE_ENV === undefined) delete env.NODE_ENV;
 
-  const result = spawnSync("node", ["-e", `import(${JSON.stringify(serverModulePath)})`], {
+  const result = spawnSync("node", ["-e", `import(${JSON.stringify(serverModuleUrl)})`], {
     env,
     encoding: "utf8",
     timeout: 1000
