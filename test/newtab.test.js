@@ -209,6 +209,9 @@ describe('newtab.js DOM manipulation', () => {
       const card = document.getElementById("card");
       assert.equal(card.hidden, false);
       assert.equal(card.querySelector('h1').textContent, 'Cat1');
+
+      const notice = document.getElementById("notice");
+      assert.equal(notice.textContent, "");
     });
 
     it('shows notice and hides card on empty results', async () => {

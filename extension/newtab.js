@@ -196,7 +196,6 @@ async function refresh(location, settings) {
   await storageSet({ feedCache: finalCache });
   $("location-panel").hidden = true;
   renderCard(selected);
-  showNotice(`Showing results within ${feed.radiusMiles} miles.`);
 }
 
 async function _start({ requestLocation = false } = {}) {
