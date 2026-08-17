@@ -220,6 +220,7 @@ async function _start({ requestLocation = false } = {}) {
   $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
     try { await refresh(location, resolvedSettings); } catch (error) {
+      console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
       showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;

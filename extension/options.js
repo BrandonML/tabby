@@ -33,6 +33,7 @@ async function refreshCacheForZip(postalcode, nextSettings) {
     saved.textContent = "Saved.";
     return;
   } catch (error) {
+    console.error("[tabby]", error);
     await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
     saved.textContent = "Unable to refresh nearby cats right now. Try updating your zip code.";
     return;

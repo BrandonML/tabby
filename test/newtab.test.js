@@ -315,6 +315,25 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(locPanel.hidden, false);
     });
 
+    it('logs and shows a notice when refresh fails', async () => {
+      window.fetch = async () => ({
+        ok: false,
+        json: async () => ({ error: "Server error" })
+      });
+
+      const loggedErrors = [];
+      window.console.error = (...args) => { loggedErrors.push(args); };
+
+      await window.start();
+
+      assert.equal(loggedErrors.length, 1);
+      assert.equal(loggedErrors[0][0], '[tabby]');
+      assert.equal(loggedErrors[0][1].message, 'Server error');
+
+      const notice = document.getElementById("notice");
+      assert.ok(notice.textContent.length > 0);
+    });
+
     it('prevents multiple concurrent executions', async () => {
       const p1 = window.start();
       const p2 = window.start();

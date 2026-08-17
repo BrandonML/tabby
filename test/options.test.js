@@ -135,6 +135,9 @@ describe('options.js settings logic', () => {
     let savedStorage = {};
     window.chrome.storage.local.set = async (val) => { Object.assign(savedStorage, val); };
 
+    const loggedErrors = [];
+    window.console.error = (...args) => { loggedErrors.push(args); };
+
     const zip = document.getElementById('zip');
     const form = document.getElementById('settings-form');
     const saved = document.getElementById('saved');
@@ -146,6 +149,9 @@ describe('options.js settings logic', () => {
 
     assert.equal(savedStorage.feedCache, null);
     assert.equal(saved.textContent, 'Unable to refresh nearby cats right now. Try updating your zip code.');
+    assert.equal(loggedErrors.length, 1);
+    assert.equal(loggedErrors[0][0], '[tabby]');
+    assert.equal(loggedErrors[0][1].message, 'Network error');
   });
 
   it('refreshCacheForZip invalid status error path', async () => {

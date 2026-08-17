@@ -76,6 +76,13 @@ export const server = createServer(async (request, response) => {
     else if (error.message === "Request timeout") status = 408;
     else if (error instanceof SyntaxError || /Provide a five-digit|location is required/.test(error.message)) status = 400;
 
+    console.error("[tabby-server]", {
+      status,
+      message: error.message,
+      url: request.url,
+      ...(process.env.NODE_ENV !== "production" ? { stack: error.stack } : {})
+    });
+
     return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." });
   }
 });

@@ -194,6 +194,7 @@ describe("server routing and behavior", () => {
   });
 
   it("An oversized body is rejected (413) without hanging", async () => {
+    const errorSpy = mock.method(console, 'error', () => {});
     const bigBody = "x".repeat(16385);
     const { res, data } = await request(
       { path: '/api/nearby-cats', method: 'POST' },
@@ -202,9 +203,11 @@ describe("server routing and behavior", () => {
     assert.strictEqual(res.statusCode, 413);
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Payload too large");
+    assert.strictEqual(errorSpy.mock.callCount(), 1);
   });
 
   it("Malformed JSON body returns 400, not 502", async () => {
+    const errorSpy = mock.method(console, 'error', () => {});
     const { res, data } = await request(
       { path: '/api/nearby-cats', method: 'POST' },
       "{ location: "
@@ -212,9 +215,11 @@ describe("server routing and behavior", () => {
     assert.strictEqual(res.statusCode, 400);
     const body = JSON.parse(data);
     assert.match(body.error, /Expected property name or '}'/);
+    assert.strictEqual(errorSpy.mock.callCount(), 1);
   });
 
   it("A location that fails validateLocation() returns 400 with the validation message", async () => {
+    const errorSpy = mock.method(console, 'error', () => {});
     const { res, data } = await request(
       { path: '/api/nearby-cats', method: 'POST' },
       JSON.stringify({ location: { postalcode: "123" } }) // Invalid length
@@ -222,6 +227,7 @@ describe("server routing and behavior", () => {
     assert.strictEqual(res.statusCode, 400);
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Provide a five-digit postal code or valid latitude and longitude.");
+    assert.strictEqual(errorSpy.mock.callCount(), 1);
   });
 
   it("Mock findNearbyCats failing returns 502 with the generic error message", async () => {
@@ -229,6 +235,7 @@ describe("server routing and behavior", () => {
     mock.method(global, 'fetch', async () => {
       throw new Error("Raw upstream crash");
     });
+    const errorSpy = mock.method(console, 'error', () => {});
 
     const { res, data } = await request(
       { path: '/api/nearby-cats', method: 'POST' },
@@ -238,5 +245,10 @@ describe("server routing and behavior", () => {
     assert.strictEqual(res.statusCode, 502);
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Unable to refresh nearby cats right now.");
+    assert.strictEqual(errorSpy.mock.callCount(), 1);
+    const [label, logPayload] = errorSpy.mock.calls[0].arguments;
+    assert.strictEqual(label, "[tabby-server]");
+    assert.strictEqual(logPayload.status, 502);
+    assert.strictEqual(logPayload.message, "Raw upstream crash");
   });
 });
