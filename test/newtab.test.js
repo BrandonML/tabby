@@ -112,6 +112,12 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(chips[1].textContent, "Special needs");
     assert.equal(chips[2].textContent, "$50");
   });
+  it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
+    assert.deepEqual(window.getSeenIds(null), []);
+    assert.deepEqual(window.getSeenIds(undefined), []);
+    assert.deepEqual(window.getSeenIds({}), []);
+    assert.deepEqual(window.getSeenIds({ seenIds: ['1', '2'] }), ['1', '2']);
+  });
   it('nextCard selects unseen cards and updates seenIds correctly', () => {
     const cards = [
       { id: '1', name: 'Cat 1' },
@@ -192,6 +198,23 @@ describe('newtab.js DOM manipulation', () => {
   describe('refresh', () => {
     beforeEach(() => {
       window.chrome.storage.local.get = async () => ({ feedCache: {} });
+    });
+
+    it('does not throw when stored feedCache is null (e.g. after a prior failed refresh)', async () => {
+      window.chrome.storage.local.get = async () => ({ feedCache: null });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => {
+        if (val.feedCache) savedCache = val.feedCache;
+      };
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 10 })
+      });
+
+      await window.refresh({ postalcode: '12345' });
+
+      assert.ok(savedCache);
+      assert.deepEqual(savedCache.seenIds, ['1']);
     });
 
     it('updates cache and renders card on success', async () => {

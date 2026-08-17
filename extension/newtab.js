@@ -51,8 +51,8 @@ function readingFormat(value) {
   return new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }).format(updatedAt);
 }
 
-function getSeenIds(feedCache = {}) {
-  return Array.isArray(feedCache.seenIds) ? feedCache.seenIds : [];
+function getSeenIds(feedCache) {
+  return Array.isArray(feedCache?.seenIds) ? feedCache.seenIds : [];
 }
 
 function nextCard(cards, seenIds = []) {
