@@ -1,5 +1,6 @@
 import { classifyRefreshError } from "./error-messages.js";
 import { BACKEND_URL } from "./config.js";
+import { locationFromBrowser } from "./location.js";
 
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
@@ -154,11 +155,6 @@ function renderCard(card, { stale = false } = {}) {
   cardContainer.appendChild(content);
 
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
-}
-
-async function locationFromBrowser() {
-  const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 8000, maximumAge: 15 * 60 * 1000 }));
-  return { lat: position.coords.latitude, lon: position.coords.longitude };
 }
 
 async function resolveLocation(settings, promptForLocation) {

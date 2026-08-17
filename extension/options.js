@@ -1,21 +1,21 @@
 import { classifyRefreshError } from "./error-messages.js";
 import { BACKEND_URL } from "./config.js";
+import { locationFromBrowser } from "./location.js";
 
 const form = document.getElementById("settings-form");
 const zip = document.getElementById("zip");
+const useLocation = document.getElementById("use-location");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
 
-async function refreshCacheForZip(postalcode, nextSettings) {
+async function refreshCacheForLocation(location, nextSettings) {
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
-  if (!/^\d{5}$/.test(postalcode)) return;
   const safeSettings = { ...nextSettings };
-  delete safeSettings.location;
   try {
     const response = await fetch(`${backendUrl}/api/nearby-cats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location: { postalcode } }),
+      body: JSON.stringify({ location }),
       signal: AbortSignal.timeout(10_000)
     });
     const payload = await response.json().catch(() => ({}));
@@ -30,11 +30,12 @@ async function refreshCacheForZip(postalcode, nextSettings) {
       feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, seenIds: [] }
     });
     saved.textContent = "Saved.";
+    setTimeout(() => closeSettings.click(), 600);
     return;
   } catch (error) {
     console.error("[tabby]", error);
     await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
-    saved.textContent = "Unable to refresh nearby cats right now. Try updating your zip code.";
+    saved.textContent = "Unable to refresh nearby cats right now.";
     return;
   }
 }
@@ -65,9 +66,24 @@ form.addEventListener("submit", async (event) => {
     saved.textContent = "Enter a five-digit ZIP code.";
     return;
   }
+  if (!postalcode) return;
   const { settings = {} } = await chrome.storage.local.get(["settings"]);
   const nextSettings = { ...settings, postalcode };
   delete nextSettings.location;
 
-  await refreshCacheForZip(postalcode, nextSettings);
+  await refreshCacheForLocation({ postalcode }, nextSettings);
+});
+
+useLocation.addEventListener("click", async () => {
+  try {
+    const coords = await locationFromBrowser();
+    const { settings = {} } = await chrome.storage.local.get(["settings"]);
+    const nextSettings = { ...settings, location: coords };
+    delete nextSettings.postalcode;
+
+    await refreshCacheForLocation(coords, nextSettings);
+  } catch (error) {
+    console.error("[tabby]", error);
+    saved.textContent = "Unable to access your location. Try entering a zip code instead.";
+  }
 });

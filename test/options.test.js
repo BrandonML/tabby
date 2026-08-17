@@ -8,11 +8,13 @@ const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'optio
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'options.js'), 'utf-8');
 const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
 const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
+const locationContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'location.js'), 'utf-8').replace('export async function', 'async function');
 
 function inlineScript(source) {
   return source
     .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
-    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent);
+    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent)
+    .replace(/import \{ locationFromBrowser \} from "\.\/location\.js";/, locationContent);
 }
 
 describe('options.js settings logic', () => {
@@ -106,7 +108,7 @@ describe('options.js settings logic', () => {
     assert.equal(saved.textContent, 'Enter a five-digit ZIP code.');
   });
 
-  it('refreshCacheForZip success path writes settings and cache using the configured backend URL', async () => {
+  it('ZIP save path writes settings and cache using the configured backend URL', async () => {
     let savedStorage = {};
     window.chrome.storage.local.set = async (val) => { Object.assign(savedStorage, val); };
 
@@ -137,7 +139,7 @@ describe('options.js settings logic', () => {
     assert.equal(saved.textContent, 'Saved.');
   });
 
-  it('refreshCacheForZip network error path', async () => {
+  it('ZIP save path network error path', async () => {
     window.fetch = async () => { throw new Error("Network error"); };
 
     let savedStorage = {};
@@ -156,13 +158,13 @@ describe('options.js settings logic', () => {
     await new Promise(r => setTimeout(r, 10));
 
     assert.equal(savedStorage.feedCache, null);
-    assert.equal(saved.textContent, 'Unable to refresh nearby cats right now. Try updating your zip code.');
+    assert.equal(saved.textContent, 'Unable to refresh nearby cats right now.');
     assert.equal(loggedErrors.length, 1);
     assert.equal(loggedErrors[0][0], '[tabby]');
     assert.equal(loggedErrors[0][1].message, 'Network error');
   });
 
-  it('refreshCacheForZip invalid status error path', async () => {
+  it('ZIP save path invalid status error path', async () => {
     window.fetch = async () => ({
       ok: false,
       json: async () => ({ error: "Server error" })
@@ -192,5 +194,106 @@ describe('options.js settings logic', () => {
 
     await new Promise(r => setTimeout(r, 10));
     assert.ok(closeCalled);
+  });
+
+  it('submitting a blank ZIP is a no-op', async () => {
+    let setCalled = false;
+    window.chrome.storage.local.set = async () => { setCalled = true; };
+
+    const form = document.getElementById('settings-form');
+    const saved = document.getElementById('saved');
+
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.equal(setCalled, false);
+    assert.equal(saved.textContent, '');
+  });
+
+  describe('Use my location', () => {
+    it('resolves coordinates and saves settings using them', async () => {
+      window.navigator.geolocation = {
+        getCurrentPosition: (success) => success({ coords: { latitude: 30, longitude: 40 } })
+      };
+
+      let savedStorage = {};
+      window.chrome.storage.local.set = async (val) => { Object.assign(savedStorage, val); };
+
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return {
+          ok: true,
+          json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 5 })
+        };
+      };
+
+      const useLocationBtn = document.getElementById('use-location');
+      const saved = document.getElementById('saved');
+
+      useLocationBtn.dispatchEvent(new window.Event('click'));
+
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.deepEqual(fetchedBody.location, { lat: 30, lon: 40 });
+      assert.deepEqual(savedStorage.settings, { location: { lat: 30, lon: 40 } });
+      assert.ok(savedStorage.feedCache);
+      assert.equal(saved.textContent, 'Saved.');
+    });
+
+    it('shows a fallback message when geolocation permission is denied', async () => {
+      window.navigator.geolocation = {
+        getCurrentPosition: (success, error) => error(new Error('User denied Geolocation'))
+      };
+
+      let setCalled = false;
+      window.chrome.storage.local.set = async () => { setCalled = true; };
+
+      const loggedErrors = [];
+      window.console.error = (...args) => { loggedErrors.push(args); };
+
+      const useLocationBtn = document.getElementById('use-location');
+      const saved = document.getElementById('saved');
+
+      useLocationBtn.dispatchEvent(new window.Event('click'));
+
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(setCalled, false);
+      assert.equal(saved.textContent, 'Unable to access your location. Try entering a zip code instead.');
+      assert.equal(loggedErrors.length, 1);
+      assert.equal(loggedErrors[0][0], '[tabby]');
+    });
+  });
+
+  it('auto-navigates back a brief moment after a successful save', async () => {
+    let timeoutDelay;
+    let timeoutCallback;
+    window.setTimeout = (cb, delay) => { timeoutCallback = cb; timeoutDelay = delay; return 0; };
+
+    let tabsCreated = false;
+    let tabsRemoved = false;
+    window.chrome.tabs.query = (query, cb) => cb([{ id: 7 }]);
+    window.chrome.tabs.create = (opts, cb) => { tabsCreated = true; if (cb) cb(); };
+    window.chrome.tabs.remove = () => { tabsRemoved = true; };
+
+    const zip = document.getElementById('zip');
+    const form = document.getElementById('settings-form');
+    const saved = document.getElementById('saved');
+
+    zip.value = '12345';
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.equal(saved.textContent, 'Saved.');
+    assert.equal(timeoutDelay, 600);
+    assert.equal(tabsCreated, false, 'should not navigate before the delay elapses');
+
+    timeoutCallback();
+
+    assert.equal(tabsCreated, true);
+    assert.equal(tabsRemoved, true);
   });
 });

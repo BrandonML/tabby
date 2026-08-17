@@ -8,11 +8,13 @@ const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newta
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.js'), 'utf-8');
 const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
 const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
+const locationContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'location.js'), 'utf-8').replace('export async function', 'async function');
 
 function inlineScript(source) {
   return source
     .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
-    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent);
+    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent)
+    .replace(/import \{ locationFromBrowser \} from "\.\/location\.js";/, locationContent);
 }
 
 describe('newtab.js DOM manipulation', () => {
