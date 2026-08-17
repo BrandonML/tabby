@@ -20,12 +20,12 @@ Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a ne
    ```
 
 2. In Chrome, open `chrome://extensions`, turn on Developer mode, select **Load unpacked**, and select this `tabby` folder.
-3. Open Tabby settings and retain `http://localhost:8787` for local development. Enter a fallback ZIP if preferred.
+3. The backend URL is a build-time constant in `extension/config.js`, defaulting to `http://localhost:8787` — Settings only has a ZIP field and a "Use my location" button, no Backend URL field to configure.
 4. Open a new tab and allow location, or enter a ZIP.
 
 ## Production deployment
 
-Deploy `server/` behind HTTPS, set `RG_API_KEY` in the platform’s secret manager, set `ALLOW_ORIGIN` to the installed extension’s exact `chrome-extension://<id>` origin, and point Tabby settings at that HTTPS endpoint. The in-memory cache is suitable for local development; replace it with a bounded shared cache (for example, KV/Redis) for multi-instance production.
+Deploy `server/` behind HTTPS, set `RG_API_KEY` in the platform’s secret manager, set `ALLOW_ORIGIN` to the installed extension’s exact `chrome-extension://<id>` origin, and update `BACKEND_URL` in `extension/config.js` to that HTTPS endpoint before packaging a release with `npm run release <version>`. The in-memory cache is suitable for local development; replace it with a bounded shared cache (for example, KV/Redis) for multi-instance production.
 
 ## Validation
 
