@@ -16,19 +16,25 @@ if (!process.env.RG_API_KEY) {
 const CONTENT_TYPE = "application/vnd.api+json";
 const API_KEY = process.env.RG_API_KEY;
 
-// A stable, high-population ZIP, searched at the widest radius step (100mi),
-// chosen to make it likely there are enough cats to span multiple pages.
-// Confirmed by a live run: page 1 returned exactly MAX_LIMIT (25) results,
-// meaning there's more available to page into.
+// A stable, high-population ZIP, searched at the widest radius step (100mi).
+// Confirmed by a live run: ~2494 cats available (page 1 returned exactly
+// MAX_LIMIT (25) results), so it reliably spans multiple pages.
 const LOCATION = { postalcode: "10001" };
 const MILES = 100;
 
-// A first live run with page[number]/page[size] (JSON:API-style bracket
-// params) got HTTP 400 "Arrayis an invalid page." from RescueGroups —
-// their query-string parser turns page[number]=..&page[size]=.. into an
-// array for `page`, and their validation rejects an array there. That
-// points at `page` being a plain scalar instead, with `limit` (already
-// sent by buildSearchRequest) continuing to control page size.
+// Confirmed pagination contract (live run against the location above):
+// - `page` is a plain scalar query param (e.g. page=2), NOT JSON:API-style
+//   page[number]/page[size]. Bracket params got HTTP 400 "Arrayis an
+//   invalid page." — RescueGroups' query-string parser turns bracket
+//   params into an array for `page`, and their validation rejects that.
+// - `limit` (already sent by buildSearchRequest) continues to control page
+//   size; it isn't part of the page param.
+// - A page far beyond available results returns HTTP 200 with an empty
+//   `data` array — not an error, not wrapped-around results. The response's
+//   `meta` also includes `count` (total matching), `countReturned`,
+//   `pageReturned`, and `pages` (total page count), which findNearbyCats's
+//   radius-escalation logic can use to know when to stop paging instead of
+//   guessing from an empty array alone.
 async function searchPage(pageNumber) {
   const { url, body } = buildSearchRequest(LOCATION, MILES);
   const pagedUrl = new URL(url);
@@ -58,25 +64,24 @@ describe("RescueGroups live pagination contract", () => {
     console.log("[live] page 2 status:", page2.status, "ids:", idsOf(page2.payload));
 
     assert.ok(page1.ok, `page 1 request failed: ${JSON.stringify(page1.payload)}`);
-    assert.ok(page2.ok, `page 2 request failed (this is the key signal for whether a plain scalar "page" param is the right shape): ${JSON.stringify(page2.payload)}`);
+    assert.ok(page2.ok, `page 2 request failed: ${JSON.stringify(page2.payload)}`);
 
     const page1Ids = new Set(idsOf(page1.payload));
     const page2Ids = new Set(idsOf(page2.payload));
     const overlap = [...page1Ids].filter((id) => page2Ids.has(id));
 
     console.log("[live] overlap between page 1 and page 2:", overlap);
-    assert.equal(overlap.length, 0, "page 2 repeated page 1's ids — a scalar \"page\" param may not be the right shape, or this location doesn't have enough cats to span two pages");
+    assert.equal(overlap.length, 0, "page 2 repeated page 1's ids — pagination may have regressed, or this location no longer has enough cats to span two pages");
   });
 
-  it("logs what happens when requesting a page far beyond available results", async () => {
+  it("a page far beyond available results returns 200 with an empty array, not an error", async () => {
     const farPage = await searchPage(9999);
 
     console.log("[live] far-out-of-range page status:", farPage.status);
-    console.log("[live] far-out-of-range page ids:", idsOf(farPage.payload));
-    console.log("[live] far-out-of-range page body:", JSON.stringify(farPage.payload));
+    console.log("[live] far-out-of-range page meta:", farPage.payload?.meta);
 
-    // Exploratory: no assertion yet. Once a real run shows the actual
-    // behavior (empty array vs. error vs. wrapped-around results), lock
-    // this in with a real assertion in a follow-up commit.
+    assert.ok(farPage.ok, `expected a 200, got ${farPage.status}: ${JSON.stringify(farPage.payload)}`);
+    assert.deepEqual(idsOf(farPage.payload), [], "expected an empty results array for an out-of-range page");
+    assert.equal(farPage.payload?.meta?.countReturned, 0);
   });
 });
