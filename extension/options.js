@@ -1,14 +1,13 @@
 import { classifyRefreshError } from "./error-messages.js";
+import { BACKEND_URL } from "./config.js";
 
 const form = document.getElementById("settings-form");
-const backend = document.getElementById("backend");
-const backendField = document.getElementById("backend-field");
 const zip = document.getElementById("zip");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
 
 async function refreshCacheForZip(postalcode, nextSettings) {
-  const backendUrl = (nextSettings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
   if (!/^\d{5}$/.test(postalcode)) return;
   const safeSettings = { ...nextSettings };
   delete safeSettings.location;
@@ -42,7 +41,6 @@ async function refreshCacheForZip(postalcode, nextSettings) {
 
 chrome.storage.local.get(["settings"], ({ settings = {} }) => {
   const savedSettings = settings || {};
-  backend.value = savedSettings.backendUrl || "http://localhost:8787";
   zip.value = savedSettings.postalcode || "";
 });
 
@@ -70,7 +68,6 @@ form.addEventListener("submit", async (event) => {
   const { settings = {} } = await chrome.storage.local.get(["settings"]);
   const nextSettings = { ...settings, postalcode };
   delete nextSettings.location;
-  nextSettings.backendUrl = backend.value.trim().replace(/\/$/, "") || "http://localhost:8787";
 
   await refreshCacheForZip(postalcode, nextSettings);
 });

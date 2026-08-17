@@ -7,6 +7,13 @@ import path from 'node:path';
 const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'options.html'), 'utf-8');
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'options.js'), 'utf-8');
 const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
+const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
+
+function inlineScript(source) {
+  return source
+    .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
+    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent);
+}
 
 describe('options.js settings logic', () => {
   let dom;
@@ -54,10 +61,7 @@ describe('options.js settings logic', () => {
     });
 
     const scriptEl = document.createElement('script');
-    scriptEl.textContent = jsContent.replace(
-      /import \{ classifyRefreshError \} from "\.\/error-messages\.js";/,
-      errorMsgsContent
-    );
+    scriptEl.textContent = inlineScript(jsContent);
     document.body.appendChild(scriptEl);
   });
 
@@ -72,7 +76,7 @@ describe('options.js settings logic', () => {
       storage: {
         local: {
           get: (keys, cb) => {
-            if (cb) cb({ settings: { backendUrl: 'http://custom:8787', postalcode: '90210' } });
+            if (cb) cb({ settings: { postalcode: '90210' } });
           }
         }
       }
@@ -80,16 +84,12 @@ describe('options.js settings logic', () => {
 
     const scriptEl = document.createElement('script');
     // Wrap in an IIFE to avoid "Identifier has already been declared" when re-evaluating top-level let/const
-    scriptEl.textContent = `(() => { ${jsContent.replace(
-      /import \{ classifyRefreshError \} from "\.\/error-messages\.js";/,
-      errorMsgsContent
-    )} })();`;
+    scriptEl.textContent = `(() => { ${inlineScript(jsContent)} })();`;
     document.body.appendChild(scriptEl);
 
     // Allow get callback to resolve
     await new Promise(r => setTimeout(r, 10));
 
-    assert.equal(document.getElementById('backend').value, 'http://custom:8787');
     assert.equal(document.getElementById('zip').value, '90210');
   });
 
@@ -106,24 +106,32 @@ describe('options.js settings logic', () => {
     assert.equal(saved.textContent, 'Enter a five-digit ZIP code.');
   });
 
-  it('refreshCacheForZip success path writes settings and cache', async () => {
+  it('refreshCacheForZip success path writes settings and cache using the configured backend URL', async () => {
     let savedStorage = {};
     window.chrome.storage.local.set = async (val) => { Object.assign(savedStorage, val); };
 
+    let fetchedUrl;
+    window.fetch = async (url) => {
+      fetchedUrl = url;
+      return {
+        ok: true,
+        json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 5 })
+      };
+    };
+
     const zip = document.getElementById('zip');
-    const backend = document.getElementById('backend');
     const form = document.getElementById('settings-form');
     const saved = document.getElementById('saved');
 
     zip.value = '12345';
-    backend.value = 'http://test';
 
     form.dispatchEvent(new window.Event('submit', { cancelable: true }));
 
     // Await microtasks
     await new Promise(r => setTimeout(r, 10));
 
-    assert.deepEqual(savedStorage.settings, { backendUrl: 'http://test', postalcode: '12345' });
+    assert.equal(fetchedUrl, 'http://localhost:8787/api/nearby-cats');
+    assert.deepEqual(savedStorage.settings, { postalcode: '12345' });
     assert.ok(savedStorage.feedCache);
     assert.equal(savedStorage.feedCache.cards.length, 1);
     assert.equal(saved.textContent, 'Saved.');

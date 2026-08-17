@@ -6,6 +6,14 @@ import path from 'node:path';
 
 const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.html'), 'utf-8');
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.js'), 'utf-8');
+const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
+const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
+
+function inlineScript(source) {
+  return source
+    .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
+    .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent);
+}
 
 describe('newtab.js DOM manipulation', () => {
   let dom;
@@ -32,10 +40,7 @@ describe('newtab.js DOM manipulation', () => {
 
     // Inject the js
     const scriptEl = document.createElement('script');
-    scriptEl.textContent = jsContent.replace(
-      /import \{ classifyRefreshError \} from "\.\/error-messages\.js";/,
-      fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function')
-    );
+    scriptEl.textContent = inlineScript(jsContent);
     document.body.appendChild(scriptEl);
   });
 
@@ -192,15 +197,20 @@ describe('newtab.js DOM manipulation', () => {
       window.chrome.storage.local.set = async (val) => {
         if (val.feedCache) savedCache = val.feedCache;
       };
-      window.fetch = async () => ({
-        ok: true,
-        json: async () => ({
-          cards: [{ id: '1', name: 'Cat1' }],
-          radiusMiles: 10
-        })
-      });
+      let fetchedUrl;
+      window.fetch = async (url) => {
+        fetchedUrl = url;
+        return {
+          ok: true,
+          json: async () => ({
+            cards: [{ id: '1', name: 'Cat1' }],
+            radiusMiles: 10
+          })
+        };
+      };
 
-      await window.refresh({ postalcode: '12345' }, {});
+      await window.refresh({ postalcode: '12345' });
+      assert.equal(fetchedUrl, 'http://localhost:8787/api/nearby-cats');
       assert.ok(savedCache);
       assert.equal(savedCache.cards.length, 1);
       assert.equal(savedCache.radiusMiles, 10);
@@ -220,7 +230,7 @@ describe('newtab.js DOM manipulation', () => {
         json: async () => ({ cards: [], radiusMiles: 5 })
       });
 
-      await window.refresh({ postalcode: '12345' }, {});
+      await window.refresh({ postalcode: '12345' });
       const card = document.getElementById("card");
       const notice = document.getElementById("notice");
       assert.equal(card.hidden, true);
@@ -234,7 +244,7 @@ describe('newtab.js DOM manipulation', () => {
       });
 
       try {
-        await window.refresh({ postalcode: '12345' }, {});
+        await window.refresh({ postalcode: '12345' });
         assert.fail('should have thrown');
       } catch (e) {
         assert.equal(e.message, "Server error");
@@ -247,7 +257,7 @@ describe('newtab.js DOM manipulation', () => {
 
     beforeEach(() => {
       window.chrome.storage.local.get = async () => ({
-        settings: { backendUrl: 'http://test', postalcode: '12345' },
+        settings: { postalcode: '12345' },
         feedCache: null
       });
       window.fetch = async () => ({
@@ -258,7 +268,7 @@ describe('newtab.js DOM manipulation', () => {
 
     it('handles fresh cache', async () => {
       window.chrome.storage.local.get = async () => ({
-        settings: { backendUrl: 'http://test', postalcode: '12345', location: { lat: 1, lon: 2 } },
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
         feedCache: {
           cards: [{ id: '1', name: 'Cat1' }],
           fetchedAt: Date.now() - (1000 * 60), // 1 min old (fresh)
@@ -279,7 +289,7 @@ describe('newtab.js DOM manipulation', () => {
 
     it('handles stale-while-revalidate', async () => {
       window.chrome.storage.local.get = async () => ({
-        settings: { backendUrl: 'http://test', postalcode: '12345', location: { lat: 1, lon: 2 } },
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
         feedCache: {
           cards: [{ id: '1', name: 'CatStale' }],
           fetchedAt: Date.now() - (1000 * 60 * 10), // 10 mins old (stale but valid)

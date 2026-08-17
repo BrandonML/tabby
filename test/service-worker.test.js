@@ -40,12 +40,12 @@ describe('service-worker.js', () => {
     installedListener();
 
     // Check seeded values
-    assert.deepEqual(setSettings, { settings: { backendUrl: "http://localhost:8787", postalcode: "" } });
+    assert.deepEqual(setSettings, { settings: { postalcode: "" } });
   });
 
   it('does not overwrite existing settings on installed', async () => {
     let installedListener;
-    let savedSettings = { backendUrl: "https://custom.com", postalcode: "12345" };
+    let savedSettings = { postalcode: "12345" };
     let setSettings = null;
 
     global.chrome = {

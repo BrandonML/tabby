@@ -1,4 +1,5 @@
 import { classifyRefreshError } from "./error-messages.js";
+import { BACKEND_URL } from "./config.js";
 
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
@@ -176,9 +177,9 @@ async function resolveLocation(settings, promptForLocation) {
   return /^\d{5}$/.test(settings.postalcode || "") ? { postalcode: settings.postalcode } : null;
 }
 
-async function refresh(location, settings) {
+async function refresh(location) {
   const { feedCache } = await storageGet(["feedCache"]);
-  const backendUrl = (settings.backendUrl || "http://localhost:8787").replace(/\/$/, "");
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
   const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }), signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
   const feed = await response.json();
@@ -200,9 +201,8 @@ async function refresh(location, settings) {
 
 async function _start({ requestLocation = false } = {}) {
   setCardVisible(false);
-  const { settings = { backendUrl: "http://localhost:8787", postalcode: "", location: null }, feedCache } = await storageGet(["settings", "feedCache"]);
+  const { settings = { postalcode: "", location: null }, feedCache } = await storageGet(["settings", "feedCache"]);
   const resolvedSettings = {
-    backendUrl: settings.backendUrl || "http://localhost:8787",
     postalcode: settings.postalcode || "",
     location: settings.location || null
   };
@@ -218,7 +218,7 @@ async function _start({ requestLocation = false } = {}) {
   if (!location) { $("location-panel").hidden = false; return; }
   $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
-    try { await refresh(location, resolvedSettings); } catch (error) {
+    try { await refresh(location); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
       showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
