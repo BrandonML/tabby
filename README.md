@@ -33,4 +33,11 @@ Deploy `server/` behind HTTPS, set `RG_API_KEY` in the platform’s secret manag
 npm.cmd test
 ```
 
+Before merging any pagination-related change (see Task 8 in `TASKS.md`), also run the live RescueGroups integration test once against the real API to confirm the pagination contract still holds. It requires a real `RG_API_KEY` and is excluded from `npm test`/CI by design:
+
+```powershell
+$env:RG_API_KEY = "your-key"
+npm.cmd run test:live
+```
+
 The project design follows the architecture document in the parent workspace. The API key is intentionally absent from all source files.

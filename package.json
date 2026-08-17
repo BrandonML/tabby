@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "test:live": "node --test test-live/rescuegroups.live.js",
     "start:server": "node server/index.js",
     "release": "node scripts/release.js"
   },
