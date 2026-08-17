@@ -162,6 +162,10 @@ describe('options.js settings logic', () => {
     assert.equal(loggedErrors.length, 1);
     assert.equal(loggedErrors[0][0], '[tabby]');
     assert.equal(loggedErrors[0][1].message, 'Network error');
+
+    const saveBtn = document.getElementById('save-settings');
+    assert.equal(saveBtn.disabled, false, 'Save button should be re-enabled after a failure so the user can retry');
+    assert.equal(saveBtn.textContent, 'Save');
   });
 
   it('ZIP save path invalid status error path', async () => {
@@ -184,6 +188,28 @@ describe('options.js settings logic', () => {
 
     assert.equal(savedStorage.feedCache, null);
     assert.ok(saved.textContent.includes('Server error'));
+  });
+
+  it('immediately disables both buttons and shows in-progress text on ZIP submit', async () => {
+    const zip = document.getElementById('zip');
+    const form = document.getElementById('settings-form');
+    const saveBtn = document.getElementById('save-settings');
+    const useLocationBtn = document.getElementById('use-location');
+
+    zip.value = '12345';
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+
+    // Assert synchronously, before any awaited work in the handler resolves,
+    // so this only passes if the button updates before the network call.
+    assert.equal(saveBtn.disabled, true);
+    assert.equal(useLocationBtn.disabled, true, 'the other action should be blocked too, to avoid a racing save');
+    assert.equal(saveBtn.textContent, 'Saving…');
+
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.equal(saveBtn.disabled, false);
+    assert.equal(useLocationBtn.disabled, false);
+    assert.equal(saveBtn.textContent, 'Save');
   });
 
   it('closes settings when close button clicked', async () => {
@@ -230,9 +256,16 @@ describe('options.js settings logic', () => {
       };
 
       const useLocationBtn = document.getElementById('use-location');
+      const saveBtn = document.getElementById('save-settings');
       const saved = document.getElementById('saved');
 
       useLocationBtn.dispatchEvent(new window.Event('click'));
+
+      // Assert synchronously, before the geolocation/fetch chain resolves,
+      // so this only passes if the button updates before the ~3-5s round trip.
+      assert.equal(useLocationBtn.disabled, true);
+      assert.equal(saveBtn.disabled, true, 'the other action should be blocked too, to avoid a racing save');
+      assert.equal(useLocationBtn.textContent, 'Finding your location…');
 
       await new Promise(r => setTimeout(r, 10));
 
@@ -240,6 +273,9 @@ describe('options.js settings logic', () => {
       assert.deepEqual(savedStorage.settings, { location: { lat: 30, lon: 40 } });
       assert.ok(savedStorage.feedCache);
       assert.equal(saved.textContent, 'Saved.');
+      assert.equal(useLocationBtn.disabled, false);
+      assert.equal(saveBtn.disabled, false);
+      assert.equal(useLocationBtn.textContent, 'Use my location');
     });
 
     it('shows a fallback message when geolocation permission is denied', async () => {
@@ -254,6 +290,7 @@ describe('options.js settings logic', () => {
       window.console.error = (...args) => { loggedErrors.push(args); };
 
       const useLocationBtn = document.getElementById('use-location');
+      const saveBtn = document.getElementById('save-settings');
       const saved = document.getElementById('saved');
 
       useLocationBtn.dispatchEvent(new window.Event('click'));
@@ -264,6 +301,9 @@ describe('options.js settings logic', () => {
       assert.equal(saved.textContent, 'Unable to access your location. Try entering a zip code instead.');
       assert.equal(loggedErrors.length, 1);
       assert.equal(loggedErrors[0][0], '[tabby]');
+      assert.equal(useLocationBtn.disabled, false, 'should be re-enabled after a failure so the user can retry');
+      assert.equal(saveBtn.disabled, false);
+      assert.equal(useLocationBtn.textContent, 'Use my location');
     });
   });
 

@@ -353,6 +353,37 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(locPanel.hidden, false);
     });
 
+    it('immediately disables and relabels the "Use my location" button on click', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: {}, feedCache: null
+      });
+      window.navigator.geolocation = {
+        getCurrentPosition: (success) => success({ coords: { latitude: 30, longitude: 40 } })
+      };
+
+      // Let the initial page-load start() call finish so the location panel
+      // (and its "Use my location" button) is showing, as it would be on a
+      // fresh install with no saved location.
+      await new Promise(r => setTimeout(r, 10));
+
+      const useLocationBtn = document.getElementById('use-location');
+      assert.equal(document.getElementById('location-panel').hidden, false);
+
+      useLocationBtn.dispatchEvent(new window.Event('click'));
+
+      // Assert synchronously, before the geolocation/fetch chain resolves,
+      // so this only passes if the button updates before the ~3-5s round trip.
+      assert.equal(useLocationBtn.disabled, true);
+      assert.equal(useLocationBtn.textContent, 'Finding your location…');
+
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(useLocationBtn.disabled, false);
+      assert.equal(useLocationBtn.textContent, 'Use my location');
+      const card = document.getElementById("card");
+      assert.equal(card.querySelector('h1').textContent, 'Cat1');
+    });
+
     it('logs and shows a notice when refresh fails', async () => {
       window.fetch = async () => ({
         ok: false,

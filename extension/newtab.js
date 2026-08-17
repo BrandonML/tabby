@@ -230,6 +230,17 @@ function start(options = {}) {
 }
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
-$("use-location").addEventListener("click", () => start({ requestLocation: true }));
+$("use-location").addEventListener("click", async () => {
+  const useLocationBtn = $("use-location");
+  const originalText = useLocationBtn.textContent;
+  useLocationBtn.disabled = true;
+  useLocationBtn.textContent = "Finding your location…";
+  try {
+    await start({ requestLocation: true });
+  } finally {
+    useLocationBtn.disabled = false;
+    useLocationBtn.textContent = originalText;
+  }
+});
 $("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 start();

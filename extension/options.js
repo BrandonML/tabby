@@ -5,8 +5,14 @@ import { locationFromBrowser } from "./location.js";
 const form = document.getElementById("settings-form");
 const zip = document.getElementById("zip");
 const useLocation = document.getElementById("use-location");
+const saveButton = document.getElementById("save-settings");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
+
+function setSaving(isSaving) {
+  useLocation.disabled = isSaving;
+  saveButton.disabled = isSaving;
+}
 
 async function refreshCacheForLocation(location, nextSettings) {
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
@@ -67,14 +73,26 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   if (!postalcode) return;
-  const { settings = {} } = await chrome.storage.local.get(["settings"]);
-  const nextSettings = { ...settings, postalcode };
-  delete nextSettings.location;
 
-  await refreshCacheForLocation({ postalcode }, nextSettings);
+  const originalText = saveButton.textContent;
+  setSaving(true);
+  saveButton.textContent = "Saving…";
+  try {
+    const { settings = {} } = await chrome.storage.local.get(["settings"]);
+    const nextSettings = { ...settings, postalcode };
+    delete nextSettings.location;
+
+    await refreshCacheForLocation({ postalcode }, nextSettings);
+  } finally {
+    setSaving(false);
+    saveButton.textContent = originalText;
+  }
 });
 
 useLocation.addEventListener("click", async () => {
+  const originalText = useLocation.textContent;
+  setSaving(true);
+  useLocation.textContent = "Finding your location…";
   try {
     const coords = await locationFromBrowser();
     const { settings = {} } = await chrome.storage.local.get(["settings"]);
@@ -85,5 +103,8 @@ useLocation.addEventListener("click", async () => {
   } catch (error) {
     console.error("[tabby]", error);
     saved.textContent = "Unable to access your location. Try entering a zip code instead.";
+  } finally {
+    setSaving(false);
+    useLocation.textContent = originalText;
   }
 });
