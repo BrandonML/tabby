@@ -5,14 +5,8 @@ import { locationFromBrowser } from "./location.js";
 const form = document.getElementById("settings-form");
 const zip = document.getElementById("zip");
 const useLocation = document.getElementById("use-location");
-const saveButton = document.getElementById("save-settings");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
-
-function setSaving(isSaving) {
-  useLocation.disabled = isSaving;
-  saveButton.disabled = isSaving;
-}
 
 async function refreshCacheForLocation(location, nextSettings) {
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
@@ -29,6 +23,7 @@ async function refreshCacheForLocation(location, nextSettings) {
       const message = payload.error || "Unable to refresh nearby cats right now.";
       await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
       saved.textContent = classifyRefreshError(message);
+      form.hidden = false;
       return;
     }
     await chrome.storage.local.set({
@@ -42,6 +37,7 @@ async function refreshCacheForLocation(location, nextSettings) {
     console.error("[tabby]", error);
     await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
     saved.textContent = "Unable to refresh nearby cats right now.";
+    form.hidden = false;
     return;
   }
 }
@@ -74,25 +70,19 @@ form.addEventListener("submit", async (event) => {
   }
   if (!postalcode) return;
 
-  const originalText = saveButton.textContent;
-  setSaving(true);
-  saveButton.textContent = "Saving…";
-  try {
-    const { settings = {} } = await chrome.storage.local.get(["settings"]);
-    const nextSettings = { ...settings, postalcode };
-    delete nextSettings.location;
+  form.hidden = true;
+  saved.textContent = "Saving…";
 
-    await refreshCacheForLocation({ postalcode }, nextSettings);
-  } finally {
-    setSaving(false);
-    saveButton.textContent = originalText;
-  }
+  const { settings = {} } = await chrome.storage.local.get(["settings"]);
+  const nextSettings = { ...settings, postalcode };
+  delete nextSettings.location;
+
+  await refreshCacheForLocation({ postalcode }, nextSettings);
 });
 
 useLocation.addEventListener("click", async () => {
-  const originalText = useLocation.textContent;
-  setSaving(true);
-  useLocation.textContent = "Finding your location…";
+  form.hidden = true;
+  saved.textContent = "Finding your location…";
   try {
     const coords = await locationFromBrowser();
     const { settings = {} } = await chrome.storage.local.get(["settings"]);
@@ -103,8 +93,6 @@ useLocation.addEventListener("click", async () => {
   } catch (error) {
     console.error("[tabby]", error);
     saved.textContent = "Unable to access your location. Try entering a zip code instead.";
-  } finally {
-    setSaving(false);
-    useLocation.textContent = originalText;
+    form.hidden = false;
   }
 });

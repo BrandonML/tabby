@@ -353,7 +353,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(locPanel.hidden, false);
     });
 
-    it('immediately disables and relabels the "Use my location" button on click', async () => {
+    it('immediately hides the location panel and shows in-progress text on click', async () => {
       window.chrome.storage.local.get = async () => ({
         settings: {}, feedCache: null
       });
@@ -367,21 +367,47 @@ describe('newtab.js DOM manipulation', () => {
       await new Promise(r => setTimeout(r, 10));
 
       const useLocationBtn = document.getElementById('use-location');
-      assert.equal(document.getElementById('location-panel').hidden, false);
+      const locationPanel = document.getElementById('location-panel');
+      const notice = document.getElementById('notice');
+      assert.equal(locationPanel.hidden, false);
 
       useLocationBtn.dispatchEvent(new window.Event('click'));
 
       // Assert synchronously, before the geolocation/fetch chain resolves,
-      // so this only passes if the button updates before the ~3-5s round trip.
-      assert.equal(useLocationBtn.disabled, true);
-      assert.equal(useLocationBtn.textContent, 'Finding your location…');
+      // so this only passes if the UI updates before the ~3-5s round trip.
+      assert.equal(locationPanel.hidden, true);
+      assert.equal(notice.textContent, 'Finding your location…');
 
       await new Promise(r => setTimeout(r, 10));
 
-      assert.equal(useLocationBtn.disabled, false);
-      assert.equal(useLocationBtn.textContent, 'Use my location');
       const card = document.getElementById("card");
       assert.equal(card.querySelector('h1').textContent, 'Cat1');
+      // Success: the panel stays hidden and the transient message was
+      // overwritten by renderCard()'s own notice clear.
+      assert.equal(locationPanel.hidden, true);
+      assert.equal(notice.textContent, '');
+    });
+
+    it('shows a message and re-shows the panel when no location can be determined', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: {}, feedCache: null
+      });
+      window.navigator.geolocation = {
+        getCurrentPosition: (success, error) => error(new Error('User denied Geolocation'))
+      };
+
+      await new Promise(r => setTimeout(r, 10));
+
+      const useLocationBtn = document.getElementById('use-location');
+      const locationPanel = document.getElementById('location-panel');
+      const notice = document.getElementById('notice');
+
+      useLocationBtn.dispatchEvent(new window.Event('click'));
+
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(locationPanel.hidden, false);
+      assert.ok(notice.textContent.includes('Unable to determine your location'));
     });
 
     it('logs and shows a notice when refresh fails', async () => {

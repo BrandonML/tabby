@@ -211,7 +211,13 @@ async function _start({ requestLocation = false } = {}) {
     showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
-  if (!location) { $("location-panel").hidden = false; return; }
+  if (!location) {
+    $("location-panel").hidden = false;
+    if (requestLocation) {
+      showNotice("Unable to determine your location. Try entering a zip code instead.", { linkText: "zip code", linkAction: "open-settings" });
+    }
+    return;
+  }
   $("location-panel").hidden = true;
   if (age >= FRESH_MS || !feedCache?.cards?.length) {
     try { await refresh(location); } catch (error) {
@@ -231,16 +237,9 @@ function start(options = {}) {
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 $("use-location").addEventListener("click", async () => {
-  const useLocationBtn = $("use-location");
-  const originalText = useLocationBtn.textContent;
-  useLocationBtn.disabled = true;
-  useLocationBtn.textContent = "Finding your location…";
-  try {
-    await start({ requestLocation: true });
-  } finally {
-    useLocationBtn.disabled = false;
-    useLocationBtn.textContent = originalText;
-  }
+  $("location-panel").hidden = true;
+  showNotice("Finding your location…");
+  await start({ requestLocation: true });
 });
 $("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 start();
