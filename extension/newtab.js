@@ -105,9 +105,11 @@ function nextCard(cards, seenIds = []) {
   return { selected, nextSeenIds: [selected.id] };
 }
 
-function renderCard(card, { stale = false } = {}) {
+function renderCard(card, { stale = false, exploreLabel = null } = {}) {
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(" · ");
-  const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away` : null;
+  // While exploring, distanceMiles is measured from the explored city, not
+  // the user — naming that city avoids the number reading as "from you".
+  const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${exploreLabel ? ` from ${exploreLabel}` : ""}` : null;
   const updatedAt = readingFormat(card.updatedAt);
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
@@ -283,10 +285,13 @@ function start(options = {}) {
 }
 
 // Exploring never touches the `feedCache` storage key, so it can't clobber
-// the user's real cache. State lives only in this tab's memory (the DOM's
-// hidden explore-banner is the actual source of truth) — reloading the new
-// tab always returns to the user's own location, which is the desired
-// "transient" behavior.
+// the user's real cache. State lives only in this tab's memory (exploreBatch
+// plus the DOM's hidden explore-banner) — reloading the new tab always
+// returns to the user's own location, which is the desired "transient"
+// behavior. The full fetched batch (not just the one shown card) is kept so
+// "Show another cat" can cycle through it without a second network call.
+let exploreBatch = null; // { label, cards, seenIds } while exploring, else null
+
 async function exploreArea() {
   const entry = EXPLORE_LOCATIONS[Math.floor(Math.random() * EXPLORE_LOCATIONS.length)];
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
@@ -300,19 +305,29 @@ async function exploreArea() {
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not explore that area.");
     const feed = await response.json();
     if (!feed.cards?.length) {
+      exploreBatch = null;
       hideExploreBanner();
       showNotice(`No available cats were found near ${entry.label}. Try exploring again.`);
       return;
     }
-    const { selected } = nextCard(feed.cards, []);
+    const { selected, nextSeenIds } = nextCard(feed.cards, []);
+    exploreBatch = { label: entry.label, cards: feed.cards, seenIds: nextSeenIds };
     $("location-panel").hidden = true;
-    renderCard(selected);
+    renderCard(selected, { exploreLabel: entry.label });
     showExploreBanner(entry.label);
   } catch (error) {
     console.error("[tabby]", error);
+    exploreBatch = null;
     hideExploreBanner();
     showNotice("Unable to explore that area right now. Try again.");
   }
+}
+
+function showAnotherExploreCard() {
+  if (!exploreBatch) return;
+  const { selected, nextSeenIds } = nextCard(exploreBatch.cards, exploreBatch.seenIds);
+  exploreBatch = { ...exploreBatch, seenIds: nextSeenIds };
+  renderCard(selected, { exploreLabel: exploreBatch.label });
 }
 
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
@@ -326,7 +341,9 @@ $("explore").addEventListener("click", async () => {
   showNotice("Exploring a new area…");
   await exploreArea();
 });
+$("show-another-explore-cat").addEventListener("click", () => showAnotherExploreCard());
 $("back-to-my-area").addEventListener("click", async () => {
+  exploreBatch = null;
   hideExploreBanner();
   await start();
 });

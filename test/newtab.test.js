@@ -627,5 +627,64 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(loggedErrors[0][0], '[tabby]');
       assert.ok(document.getElementById('notice').textContent.length > 0);
     });
+
+    it('shows the distance relative to the explored city, not the user, while exploring', async () => {
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat', distanceMiles: 3.14 }], radiusMiles: 25 })
+      });
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      const distanceText = document.querySelector('.distance').textContent;
+      const label = document.getElementById('explore-label').textContent;
+      assert.equal(distanceText, `3.1 mi away from ${label}`);
+    });
+
+    it('"Show another cat" cycles through the already-fetched batch without a new fetch', async () => {
+      let fetchCalls = 0;
+      window.fetch = async () => {
+        fetchCalls++;
+        return {
+          ok: true,
+          json: async () => ({
+            cards: [{ id: 'e1', name: 'ExploreCatOne' }, { id: 'e2', name: 'ExploreCatTwo' }],
+            radiusMiles: 25
+          })
+        };
+      };
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+      assert.equal(fetchCalls, 1);
+
+      const firstName = document.getElementById('card').querySelector('h1').textContent;
+      assert.ok(['ExploreCatOne', 'ExploreCatTwo'].includes(firstName));
+
+      document.getElementById('show-another-explore-cat').dispatchEvent(new window.Event('click'));
+
+      const secondName = document.getElementById('card').querySelector('h1').textContent;
+      assert.ok(['ExploreCatOne', 'ExploreCatTwo'].includes(secondName));
+      assert.notEqual(firstName, secondName, 'the second card should be the other unseen cat in the batch');
+      assert.equal(fetchCalls, 1, 'cycling to another explored cat must not trigger a new fetch');
+      assert.equal(document.getElementById('explore-banner').hidden, false);
+    });
+
+    it('"Back to my area" clears the explore batch so "Show another cat" is a no-op afterward', async () => {
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 })
+      });
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      document.getElementById('back-to-my-area').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      document.getElementById('show-another-explore-cat').dispatchEvent(new window.Event('click'));
+      assert.equal(document.getElementById('card').querySelector('h1').textContent, 'HomeCat');
+    });
   });
 });
