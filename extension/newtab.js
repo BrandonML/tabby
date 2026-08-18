@@ -126,6 +126,14 @@ function renderCard(card, { stale = false, exploreLabel = null } = {}) {
   img.alt = card.name;
   img.referrerPolicy = "no-referrer";
   img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
+  img.addEventListener("load", () => {
+    // A portrait-oriented photo (taller than wide) crops heavily under this
+    // card's landscape-shaped object-fit: cover box — switch to contain so
+    // the cat stays fully visible instead of losing its head or feet.
+    if (img.naturalWidth < img.naturalHeight) {
+      img.classList.add("photo-contain");
+    }
+  });
   cardContainer.appendChild(img);
 
   const content = document.createElement("div");
