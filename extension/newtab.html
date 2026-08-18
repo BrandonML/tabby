@@ -3,7 +3,13 @@
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tabby</title><link rel="stylesheet" href="newtab.css"></head>
   <body>
     <main class="shell">
-      <header><p class="eyebrow">TABBY</p><button id="settings" class="quiet">Settings</button></header>
+      <header>
+        <p class="eyebrow">TABBY</p>
+        <div class="header-actions">
+          <button id="explore" class="quiet" type="button">Explore another area</button>
+          <button id="settings" class="quiet">Settings</button>
+        </div>
+      </header>
       <section id="card" class="card loading" aria-live="polite" hidden><p>Finding an adoptable cat near you…</p></section>
       <section id="location-panel" class="location-panel" hidden>
         <h1>Find cats near you</h1>
@@ -13,6 +19,7 @@
           <button id="open-settings" class="secondary" type="button">or enter your zip code</button>
         </div>
       </section>
+      <p id="explore-banner" class="notice" role="status" hidden>Exploring near <span id="explore-label"></span>. <button id="back-to-my-area" class="notice-link" type="button">Back to my area</button></p>
       <p id="notice" class="notice" role="status"></p>
     </main>
     <script type="module" src="newtab.js"></script>

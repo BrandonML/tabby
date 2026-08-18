@@ -533,4 +533,99 @@ describe('newtab.js DOM manipulation', () => {
       await p1;
     });
   });
+
+  describe('explore another area', () => {
+    beforeEach(() => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: 'home-1', name: 'HomeCat' }],
+          fetchedAt: Date.now(), // fresh — a return trip shouldn't need a new fetch
+          location: { postalcode: '12345' },
+          page: 1,
+          seenIds: []
+        }
+      });
+    });
+
+    it('fetches a random location at page 1 and shows the explore banner', async () => {
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 }) };
+      };
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(fetchedBody.page, 1);
+      assert.ok(Number.isFinite(fetchedBody.location.lat) && fetchedBody.location.lat >= -90 && fetchedBody.location.lat <= 90);
+      assert.ok(Number.isFinite(fetchedBody.location.lon) && fetchedBody.location.lon >= -180 && fetchedBody.location.lon <= 180);
+
+      const card = document.getElementById('card');
+      assert.equal(card.querySelector('h1').textContent, 'ExploreCat');
+
+      const banner = document.getElementById('explore-banner');
+      assert.equal(banner.hidden, false);
+      assert.ok(document.getElementById('explore-label').textContent.length > 0);
+    });
+
+    it('never writes to settings while exploring, so the saved location is untouched', async () => {
+      let settingsWrites = 0;
+      window.chrome.storage.local.set = async (val) => { if (val.settings) settingsWrites++; };
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 }) });
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(settingsWrites, 0);
+    });
+
+    it('never writes to feedCache while exploring, so "back to my area" restores the original cached feed without a new fetch', async () => {
+      let feedCacheWrites = 0;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) feedCacheWrites++; };
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 }) });
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(feedCacheWrites, 0, 'exploring must not write to the feedCache storage key');
+      const exploreCard = document.getElementById('card');
+      assert.equal(exploreCard.querySelector('h1').textContent, 'ExploreCat');
+
+      let fetchCalledAgain = false;
+      window.fetch = async () => { fetchCalledAgain = true; return { ok: true, json: async () => ({ cards: [], radiusMiles: 0 }) }; };
+
+      document.getElementById('back-to-my-area').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(fetchCalledAgain, false, 'a fresh home cache should not need a new fetch when returning from explore');
+      assert.equal(document.getElementById('explore-banner').hidden, true);
+      assert.equal(document.getElementById('card').querySelector('h1').textContent, 'HomeCat');
+    });
+
+    it('shows a friendly notice and hides the banner when the explored area has no cats', async () => {
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [], radiusMiles: 100 }) });
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(document.getElementById('explore-banner').hidden, true);
+      assert.ok(document.getElementById('notice').textContent.includes('No available cats'));
+    });
+
+    it('logs and shows a notice when the explore fetch fails', async () => {
+      window.fetch = async () => ({ ok: false, json: async () => ({ error: "Server error" }) });
+      const loggedErrors = [];
+      window.console.error = (...args) => { loggedErrors.push(args); };
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(document.getElementById('explore-banner').hidden, true);
+      assert.equal(loggedErrors.length, 1);
+      assert.equal(loggedErrors[0][0], '[tabby]');
+      assert.ok(document.getElementById('notice').textContent.length > 0);
+    });
+  });
 });

@@ -7,6 +7,37 @@ const STALE_MS = 30 * 60 * 1000;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
+// Well-known US metro coordinates, chosen for broad RescueGroups coverage.
+// Not individually spot-checked against the live API — a location with no
+// results degrades gracefully via the existing "no cats found" notice.
+const EXPLORE_LOCATIONS = [
+  { lat: 40.7128, lon: -74.0060, label: "New York, NY" },
+  { lat: 34.0522, lon: -118.2437, label: "Los Angeles, CA" },
+  { lat: 41.8781, lon: -87.6298, label: "Chicago, IL" },
+  { lat: 29.7604, lon: -95.3698, label: "Houston, TX" },
+  { lat: 33.4484, lon: -112.0740, label: "Phoenix, AZ" },
+  { lat: 39.9526, lon: -75.1652, label: "Philadelphia, PA" },
+  { lat: 29.4241, lon: -98.4936, label: "San Antonio, TX" },
+  { lat: 32.7157, lon: -117.1611, label: "San Diego, CA" },
+  { lat: 32.7767, lon: -96.7970, label: "Dallas, TX" },
+  { lat: 37.3382, lon: -121.8863, label: "San Jose, CA" },
+  { lat: 30.2672, lon: -97.7431, label: "Austin, TX" },
+  { lat: 30.3322, lon: -81.6557, label: "Jacksonville, FL" },
+  { lat: 39.9612, lon: -82.9988, label: "Columbus, OH" },
+  { lat: 37.7749, lon: -122.4194, label: "San Francisco, CA" },
+  { lat: 39.7684, lon: -86.1581, label: "Indianapolis, IN" },
+  { lat: 35.2271, lon: -80.8431, label: "Charlotte, NC" },
+  { lat: 47.6062, lon: -122.3321, label: "Seattle, WA" },
+  { lat: 39.2904, lon: -76.6122, label: "Baltimore, MD" },
+  { lat: 38.9072, lon: -77.0369, label: "Washington, DC" },
+  { lat: 25.7617, lon: -80.1918, label: "Miami, FL" },
+  { lat: 44.9778, lon: -93.2650, label: "Minneapolis, MN" },
+  { lat: 39.0997, lon: -94.5786, label: "Kansas City, MO" },
+  { lat: 36.1627, lon: -86.7816, label: "Nashville, TN" },
+  { lat: 45.5152, lon: -122.6784, label: "Portland, OR" },
+  { lat: 39.7392, lon: -104.9903, label: "Denver, CO" }
+];
+
 function storageGet(keys) { return chrome.storage.local.get(keys); }
 function storageSet(value) { return chrome.storage.local.set(value); }
 function randomCard(cards) { return cards[Math.floor(Math.random() * cards.length)]; }
@@ -14,6 +45,13 @@ function setCardVisible(visible) {
   const card = $("card");
   if (!card) return;
   card.hidden = !visible;
+}
+function showExploreBanner(label) {
+  $("explore-label").textContent = label;
+  $("explore-banner").hidden = false;
+}
+function hideExploreBanner() {
+  $("explore-banner").hidden = true;
 }
 function showNotice(message, { linkText = null, linkAction = null } = {}) {
   const notice = $("notice");
@@ -244,6 +282,39 @@ function start(options = {}) {
   return inFlight;
 }
 
+// Exploring never touches the `feedCache` storage key, so it can't clobber
+// the user's real cache. State lives only in this tab's memory (the DOM's
+// hidden explore-banner is the actual source of truth) — reloading the new
+// tab always returns to the user's own location, which is the desired
+// "transient" behavior.
+async function exploreArea() {
+  const entry = EXPLORE_LOCATIONS[Math.floor(Math.random() * EXPLORE_LOCATIONS.length)];
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
+  try {
+    const response = await fetch(`${backendUrl}/api/nearby-cats`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location: { lat: entry.lat, lon: entry.lon }, page: 1 }),
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not explore that area.");
+    const feed = await response.json();
+    if (!feed.cards?.length) {
+      hideExploreBanner();
+      showNotice(`No available cats were found near ${entry.label}. Try exploring again.`);
+      return;
+    }
+    const { selected } = nextCard(feed.cards, []);
+    $("location-panel").hidden = true;
+    renderCard(selected);
+    showExploreBanner(entry.label);
+  } catch (error) {
+    console.error("[tabby]", error);
+    hideExploreBanner();
+    showNotice("Unable to explore that area right now. Try again.");
+  }
+}
+
 $("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
 $("use-location").addEventListener("click", async () => {
   $("location-panel").hidden = true;
@@ -251,4 +322,12 @@ $("use-location").addEventListener("click", async () => {
   await start({ requestLocation: true });
 });
 $("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
+$("explore").addEventListener("click", async () => {
+  showNotice("Exploring a new area…");
+  await exploreArea();
+});
+$("back-to-my-area").addEventListener("click", async () => {
+  hideExploreBanner();
+  await start();
+});
 start();
