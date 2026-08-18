@@ -127,11 +127,15 @@ function renderCard(card, { stale = false, exploreLabel = null } = {}) {
   img.referrerPolicy = "no-referrer";
   img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
   img.addEventListener("load", () => {
-    // A portrait-oriented photo (taller than wide) crops heavily under this
-    // card's landscape-shaped object-fit: cover box — switch to contain so
-    // the cat stays fully visible instead of losing its head or feet.
+    // A portrait-oriented photo (taller than wide) can't fill the card's
+    // full width without either cropping or shrinking down to fit beside
+    // empty letterbox space — there isn't a box tall enough to avoid both
+    // (RescueGroups' CDN only resizes proportionally, it can't hand us a
+    // pre-cropped or face-centered variant). Trading some width for a
+    // taller box and a top-anchored crop keeps the photo large and the
+    // subject's face/torso in frame, at the cost of some legs/tail.
     if (img.naturalWidth < img.naturalHeight) {
-      img.classList.add("photo-contain");
+      img.classList.add("photo-portrait");
     }
   });
   cardContainer.appendChild(img);

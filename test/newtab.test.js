@@ -112,19 +112,19 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(chips[1].textContent, "Special needs");
     assert.equal(chips[2].textContent, "$50");
   });
-  it('switches a portrait-oriented photo to object-fit: contain once it loads', () => {
+  it('switches a portrait-oriented photo to the taller, top-anchored crop once it loads', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
-    assert.equal(img.classList.contains('photo-contain'), false, 'should not switch before natural dimensions are known');
+    assert.equal(img.classList.contains('photo-portrait'), false, 'should not switch before natural dimensions are known');
 
     Object.defineProperty(img, 'naturalWidth', { value: 400, configurable: true });
     Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true });
     img.dispatchEvent(new window.Event('load'));
 
-    assert.ok(img.classList.contains('photo-contain'));
+    assert.ok(img.classList.contains('photo-portrait'));
   });
-  it('leaves a landscape or square photo on the default object-fit: cover', () => {
+  it('leaves a landscape or square photo on the default box and crop', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
@@ -132,7 +132,7 @@ describe('newtab.js DOM manipulation', () => {
     Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true });
     img.dispatchEvent(new window.Event('load'));
 
-    assert.equal(img.classList.contains('photo-contain'), false);
+    assert.equal(img.classList.contains('photo-portrait'), false);
   });
   it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
     assert.deepEqual(window.getSeenIds(null), []);
