@@ -134,6 +134,29 @@ describe('newtab.js DOM manipulation', () => {
 
     assert.equal(img.classList.contains('photo-portrait'), false);
   });
+  it('leaves a near-square photo (technically taller than wide, but not by much) on the default crop', () => {
+    window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+    const img = document.querySelector('.photo');
+    // Real-world example: 500x508 intrinsic size, reported as looking too
+    // close to square to be worth the portrait treatment.
+    Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 508, configurable: true });
+    img.dispatchEvent(new window.Event('load'));
+
+    assert.equal(img.classList.contains('photo-portrait'), false);
+  });
+  it('switches to the portrait treatment once a photo clears the near-square tolerance', () => {
+    window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+    const img = document.querySelector('.photo');
+    // Just over the 1.1x tolerance (500 * 1.1 = 550) — pins the exact cutoff.
+    Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 560, configurable: true });
+    img.dispatchEvent(new window.Event('load'));
+
+    assert.ok(img.classList.contains('photo-portrait'));
+  });
   it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
     assert.deepEqual(window.getSeenIds(null), []);
     assert.deepEqual(window.getSeenIds(undefined), []);

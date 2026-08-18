@@ -4,6 +4,11 @@ import { locationFromBrowser } from "./location.js";
 
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
+// A photo needs to be at least this much taller than wide before it's worth
+// switching to the taller, top-anchored "portrait" treatment — otherwise a
+// merely-near-square photo (e.g. 500x508) would get flagged for a trade-off
+// it doesn't need.
+const PORTRAIT_HEIGHT_RATIO = 1.1;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
@@ -133,8 +138,10 @@ function renderCard(card, { stale = false, exploreLabel = null } = {}) {
     // (RescueGroups' CDN only resizes proportionally, it can't hand us a
     // pre-cropped or face-centered variant). Trading some width for a
     // taller box and a top-anchored crop keeps the photo large and the
-    // subject's face/torso in frame, at the cost of some legs/tail.
-    if (img.naturalWidth < img.naturalHeight) {
+    // subject's face/torso in frame, at the cost of some legs/tail. A
+    // tolerance keeps near-square photos (e.g. 500x508) on the regular
+    // crop — they're not portrait enough to be worth the trade-off.
+    if (img.naturalHeight > img.naturalWidth * PORTRAIT_HEIGHT_RATIO) {
       img.classList.add("photo-portrait");
     }
   });
