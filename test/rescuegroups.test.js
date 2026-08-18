@@ -9,6 +9,27 @@ test("ZIP fallback uses RescueGroups native postalcode radius filter", () => {
   assert.match(request.url, /sort=animals.distance/);
 });
 
+test("buildSearchRequest defaults to page 1 and uses the raised MAX_LIMIT of 100", () => {
+  const request = buildSearchRequest({ postalcode: "33629" }, 10);
+  const url = new URL(request.url);
+  assert.equal(url.searchParams.get("page"), "1");
+  assert.equal(url.searchParams.get("limit"), "100");
+});
+
+test("buildSearchRequest sends page as a plain scalar query param, not JSON:API bracket-style", () => {
+  const request = buildSearchRequest({ postalcode: "33629" }, 10, 3);
+  const url = new URL(request.url);
+  assert.equal(url.searchParams.get("page"), "3");
+  assert.equal(url.searchParams.has("page[number]"), false);
+  assert.equal(url.searchParams.has("page[size]"), false);
+});
+
+test("buildSearchRequest falls back to page 1 for a non-positive-integer page", () => {
+  const request = buildSearchRequest({ postalcode: "33629" }, 10, -5);
+  const url = new URL(request.url);
+  assert.equal(url.searchParams.get("page"), "1");
+});
+
 test("coordinates are accepted and invalid locations are rejected", () => {
   assert.deepEqual(validateLocation({ lat: 27.95, lon: -82.5 }), { lat: 27.95, lon: -82.5 });
   assert.throws(() => validateLocation({ postalcode: "bad" }), /five-digit/);
@@ -279,6 +300,36 @@ test("findNearbyCats returns empty and exhausted if no cats are found", async ()
   assert.equal(result.radiusMiles, 100);
   assert.equal(result.cards.length, 0);
   assert.deepEqual(calls, [10, 25, 50, 100]);
+});
+
+test("searchRadius forwards the page option to the request URL", async () => {
+  let fetchUrl;
+  const fetchImpl = async (url) => {
+    fetchUrl = url;
+    return { ok: true, json: async () => createMockCards(0) };
+  };
+  await searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl, page: 4 });
+  assert.equal(new URL(fetchUrl).searchParams.get("page"), "4");
+});
+
+test("findNearbyCats forwards the page option to every radius step", async () => {
+  const pagesRequested = [];
+  const fetchImpl = async (url) => {
+    pagesRequested.push(new URL(url).searchParams.get("page"));
+    return { ok: true, json: async () => createMockCards(0) };
+  };
+  await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl, page: 2 });
+  assert.deepEqual(pagesRequested, ["2", "2", "2", "2"]);
+});
+
+test("findNearbyCats defaults to page 1 when no page option is given", async () => {
+  const pagesRequested = [];
+  const fetchImpl = async (url) => {
+    pagesRequested.push(new URL(url).searchParams.get("page"));
+    return { ok: true, json: async () => createMockCards(10) };
+  };
+  await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  assert.deepEqual(pagesRequested, ["1"]);
 });
 
 test("searchRadius throws error if apiKey is not provided", async () => {

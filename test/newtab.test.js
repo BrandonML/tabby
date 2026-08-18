@@ -275,6 +275,57 @@ describe('newtab.js DOM manipulation', () => {
         assert.equal(e.message, "Server error");
       }
     });
+
+    it('requests page 1 for a brand-new location with no prior cache', async () => {
+      window.chrome.storage.local.get = async () => ({ feedCache: null });
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 10 }) };
+      };
+
+      await window.refresh({ postalcode: '12345' });
+      assert.deepEqual(fetchedBody, { location: { postalcode: '12345' }, page: 1 });
+    });
+
+    it('advances to the next page on a repeat refresh for the same location', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: { cards: [{ id: '1' }], fetchedAt: Date.now(), location: { postalcode: '12345' }, page: 1, seenIds: ['1'] }
+      });
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: '2', name: 'Cat2' }], radiusMiles: 10 }) };
+      };
+
+      await window.refresh({ postalcode: '12345' });
+      assert.deepEqual(fetchedBody, { location: { postalcode: '12345' }, page: 2 });
+    });
+
+    it('resets to page 1 when the location has changed since the last cache', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: { cards: [{ id: '1' }], fetchedAt: Date.now(), location: { postalcode: '12345' }, page: 3, seenIds: ['1'] }
+      });
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: '2', name: 'Cat2' }], radiusMiles: 10 }) };
+      };
+
+      await window.refresh({ postalcode: '99999' });
+      assert.deepEqual(fetchedBody, { location: { postalcode: '99999' }, page: 1 });
+    });
+
+    it('stores the fetched location and page on the resulting feedCache', async () => {
+      window.chrome.storage.local.get = async () => ({ feedCache: null });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: '1', name: 'Cat1' }], radiusMiles: 10 }) });
+
+      await window.refresh({ postalcode: '12345' });
+      assert.deepEqual(savedCache.location, { postalcode: '12345' });
+      assert.equal(savedCache.page, 1);
+    });
   });
 
   describe('start', () => {
@@ -318,7 +369,7 @@ describe('newtab.js DOM manipulation', () => {
         feedCache: {
           cards: [{ id: '1', name: 'CatStale' }],
           fetchedAt: Date.now() - (1000 * 60 * 10), // 10 mins old (stale but valid)
-          seenIds: []
+          seenIds: ['1'] // fully seen, so the seen-ratio gate allows a refresh
         }
       });
 
@@ -340,6 +391,51 @@ describe('newtab.js DOM manipulation', () => {
       // Because we awaited start(), refresh has finished and we see the fresh cat.
       // (Wait, actually in _start the stale card is rendered *first*, then refresh is awaited and renders the fresh one.)
       assert.equal(card.querySelector('h1').textContent, 'CatFresh');
+    });
+
+    it('does not refresh when stale-by-time but under half the cache has been seen', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: '1', name: 'CatA' }, { id: '2', name: 'CatB' }],
+          fetchedAt: Date.now() - (1000 * 60 * 10), // 10 mins old (stale but valid, under STALE_MS)
+          seenIds: [] // 0 of 2 seen — under the 50% refresh threshold
+        }
+      });
+
+      let fetchCalled = false;
+      window.fetch = async () => {
+        fetchCalled = true;
+        return { ok: true, json: async () => ({ cards: [], radiusMiles: 10 }) };
+      };
+
+      await window.start();
+
+      assert.equal(fetchCalled, false, 'a stale-by-time cache with a low seen ratio should not trigger a background refresh');
+      const card = document.getElementById("card");
+      assert.equal(card.hidden, false);
+      assert.ok(['CatA', 'CatB'].includes(card.querySelector('h1').textContent));
+    });
+
+    it('refreshes once the hard STALE_MS cutoff is hit, even with a low seen ratio', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: '1', name: 'CatA' }, { id: '2', name: 'CatB' }],
+          fetchedAt: Date.now() - (1000 * 60 * 31), // 31 mins old — past STALE_MS
+          seenIds: [] // 0 of 2 seen, but the hard cutoff must still force a refresh
+        }
+      });
+
+      let fetchCalled = false;
+      window.fetch = async () => {
+        fetchCalled = true;
+        return { ok: true, json: async () => ({ cards: [{ id: '3', name: 'CatFresh' }], radiusMiles: 10 }) };
+      };
+
+      await window.start();
+
+      assert.equal(fetchCalled, true, 'the hard STALE_MS cutoff should force a refresh regardless of seen ratio');
     });
 
     it('shows no-location panel if no location', async () => {

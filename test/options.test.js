@@ -136,6 +136,8 @@ describe('options.js settings logic', () => {
     assert.deepEqual(savedStorage.settings, { postalcode: '12345' });
     assert.ok(savedStorage.feedCache);
     assert.equal(savedStorage.feedCache.cards.length, 1);
+    assert.deepEqual(savedStorage.feedCache.location, { postalcode: '12345' });
+    assert.equal(savedStorage.feedCache.page, 1);
     assert.equal(saved.textContent, 'Saved.');
   });
 
@@ -266,9 +268,11 @@ describe('options.js settings logic', () => {
 
       await new Promise(r => setTimeout(r, 10));
 
-      assert.deepEqual(fetchedBody.location, { lat: 30, lon: 40 });
+      assert.deepEqual(fetchedBody, { location: { lat: 30, lon: 40 }, page: 1 });
       assert.deepEqual(savedStorage.settings, { location: { lat: 30, lon: 40 } });
       assert.ok(savedStorage.feedCache);
+      assert.deepEqual(savedStorage.feedCache.location, { lat: 30, lon: 40 });
+      assert.equal(savedStorage.feedCache.page, 1);
       assert.equal(saved.textContent, 'Saved.');
       // Success: the form stays hidden — refreshCacheForLocation is about to
       // navigate away, so there's nothing to restore it for.

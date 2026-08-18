@@ -15,7 +15,7 @@ async function refreshCacheForLocation(location, nextSettings) {
     const response = await fetch(`${backendUrl}/api/nearby-cats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location }),
+      body: JSON.stringify({ location, page: 1 }),
       signal: AbortSignal.timeout(10_000)
     });
     const payload = await response.json().catch(() => ({}));
@@ -28,7 +28,7 @@ async function refreshCacheForLocation(location, nextSettings) {
     }
     await chrome.storage.local.set({
       settings: safeSettings,
-      feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, seenIds: [] }
+      feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, location, page: 1, seenIds: [] }
     });
     saved.textContent = "Saved.";
     setTimeout(() => closeSettings.click(), 600);

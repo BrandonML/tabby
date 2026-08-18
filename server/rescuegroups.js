@@ -1,7 +1,7 @@
 const BASE_URL = "https://api.rescuegroups.org/v5";
 const CONTENT_TYPE = "application/vnd.api+json";
 const RADIUS_STEPS = [10, 25, 50, 100];
-const MAX_LIMIT = 25;
+const MAX_LIMIT = 100;
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 function normalizeUrl(value) {
@@ -55,11 +55,13 @@ export function validateLocation(input) {
   throw new Error("Provide a five-digit postal code or valid latitude and longitude.");
 }
 
-export function buildSearchRequest(location, miles) {
+export function buildSearchRequest(location, miles, page = 1) {
   const safeLocation = validateLocation(location);
   if (!RADIUS_STEPS.includes(miles)) throw new Error("Unsupported search radius.");
+  const safePage = Number.isInteger(page) && page > 0 ? page : 1;
   const query = new URLSearchParams({
     limit: String(MAX_LIMIT),
+    page: String(safePage),
     sort: "animals.distance",
     include: "orgs,pictures,statuses",
     "fields[animals]": ANIMAL_FIELDS,
@@ -126,9 +128,9 @@ export function normalizeCards(payload) {
   }).filter(Boolean);
 }
 
-export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch } = {}) {
+export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch, page = 1 } = {}) {
   if (!apiKey) throw new Error("RG_API_KEY is not configured.");
-  const { url, body } = buildSearchRequest(location, miles);
+  const { url, body } = buildSearchRequest(location, miles, page);
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { Authorization: apiKey, "Content-Type": CONTENT_TYPE, Accept: CONTENT_TYPE },
@@ -143,9 +145,9 @@ export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch 
   return normalizeCards(payload);
 }
 
-export async function findNearbyCats(location, { apiKey, target = 8, fetchImpl = fetch } = {}) {
+export async function findNearbyCats(location, { apiKey, target = 8, fetchImpl = fetch, page = 1 } = {}) {
   for (const miles of RADIUS_STEPS) {
-    const cards = await searchRadius(location, miles, { apiKey, fetchImpl });
+    const cards = await searchRadius(location, miles, { apiKey, fetchImpl, page });
     if (cards.length >= target || (cards.length > 0 && miles === RADIUS_STEPS.at(-1))) {
       return { cards, radiusMiles: miles, exhausted: cards.length < target };
     }

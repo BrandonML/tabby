@@ -42,8 +42,13 @@ async function bodyOf(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-function cacheKey(location) {
-  return location.postalcode ? `zip:${location.postalcode}` : `coord:${location.lat.toFixed(2)},${location.lon.toFixed(2)}`;
+function cacheKey(location, page) {
+  const base = location.postalcode ? `zip:${location.postalcode}` : `coord:${location.lat.toFixed(2)},${location.lon.toFixed(2)}`;
+  return `${base}:p${page}`;
+}
+
+function safePage(value) {
+  return Number.isInteger(value) && value > 0 ? value : 1;
 }
 
 export const server = createServer(async (request, response) => {
@@ -51,9 +56,10 @@ export const server = createServer(async (request, response) => {
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" });
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "POST" });
   try {
-    const { location } = await bodyOf(request);
+    const { location, page } = await bodyOf(request);
     const safeLocation = validateLocation(location);
-    const key = cacheKey(safeLocation);
+    const requestedPage = safePage(page);
+    const key = cacheKey(safeLocation, requestedPage);
     const cached = cache.get(key);
 
     if (cached) {
@@ -62,7 +68,7 @@ export const server = createServer(async (request, response) => {
       if (Date.now() - cached.createdAt < CACHE_MS) return send(response, 200, { ...cached.value, cached: true });
     }
 
-    const value = await findNearbyCats(safeLocation, { apiKey: process.env.RG_API_KEY });
+    const value = await findNearbyCats(safeLocation, { apiKey: process.env.RG_API_KEY, page: requestedPage });
     cache.set(key, { createdAt: Date.now(), value });
 
     if (cache.size > MAX_CACHE_SIZE) {

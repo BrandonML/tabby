@@ -80,18 +80,19 @@ describe("server cache", () => {
 
     assert.strictEqual(cache.size, 500);
 
-    // zip:10000 should still be there because it was refreshed
-    assert.strictEqual(cache.has("zip:10000"), true);
+    // zip:10000 (page 1, the default when no page is sent) should still be
+    // there because it was refreshed
+    assert.strictEqual(cache.has("zip:10000:p1"), true);
 
     // zip:10001 through zip:10005 should be evicted
-    assert.strictEqual(cache.has("zip:10001"), false);
-    assert.strictEqual(cache.has("zip:10002"), false);
-    assert.strictEqual(cache.has("zip:10003"), false);
-    assert.strictEqual(cache.has("zip:10004"), false);
-    assert.strictEqual(cache.has("zip:10005"), false);
+    assert.strictEqual(cache.has("zip:10001:p1"), false);
+    assert.strictEqual(cache.has("zip:10002:p1"), false);
+    assert.strictEqual(cache.has("zip:10003:p1"), false);
+    assert.strictEqual(cache.has("zip:10004:p1"), false);
+    assert.strictEqual(cache.has("zip:10005:p1"), false);
 
     // zip:10006 should be there
-    assert.strictEqual(cache.has("zip:10006"), true);
+    assert.strictEqual(cache.has("zip:10006:p1"), true);
   });
 });
 
@@ -233,6 +234,67 @@ describe("server routing and behavior", () => {
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Provide a five-digit postal code or valid latitude and longitude.");
     assert.strictEqual(errorSpy.mock.callCount(), 1);
+  });
+
+  it("Different page numbers for the same location are cached independently", async () => {
+    process.env.RG_API_KEY = "test-key";
+    let fetchCalls = 0;
+    mock.method(global, 'fetch', async () => {
+      fetchCalls++;
+      return { ok: true, json: async () => ({ data: [], included: [] }) };
+    });
+
+    const page1 = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "12345" }, page: 1 })
+    );
+    assert.strictEqual(JSON.parse(page1.data).cached, false);
+    assert.strictEqual(fetchCalls, 4); // RADIUS_STEPS triggers 4 fetches if no results
+
+    const page2 = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "12345" }, page: 2 })
+    );
+    assert.strictEqual(JSON.parse(page2.data).cached, false, "a different page must not reuse page 1's cache entry");
+    assert.strictEqual(fetchCalls, 8);
+
+    // Re-requesting page 1 within CACHE_MS should still hit its own entry
+    const page1Again = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "12345" }, page: 1 })
+    );
+    assert.strictEqual(JSON.parse(page1Again.data).cached, true);
+    assert.strictEqual(fetchCalls, 8);
+  });
+
+  it("Forwards the requested page number to the RescueGroups API", async () => {
+    process.env.RG_API_KEY = "test-key";
+    const pagesRequested = [];
+    mock.method(global, 'fetch', async (url) => {
+      pagesRequested.push(new URL(url).searchParams.get("page"));
+      return { ok: true, json: async () => ({ data: [], included: [] }) };
+    });
+
+    await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "54321" }, page: 3 })
+    );
+    assert.deepEqual(pagesRequested, ["3", "3", "3", "3"]);
+  });
+
+  it("An omitted or invalid page defaults to page 1", async () => {
+    process.env.RG_API_KEY = "test-key";
+    const pagesRequested = [];
+    mock.method(global, 'fetch', async (url) => {
+      pagesRequested.push(new URL(url).searchParams.get("page"));
+      return { ok: true, json: async () => ({ data: [], included: [] }) };
+    });
+
+    await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "54322" }, page: -5 })
+    );
+    assert.deepEqual(pagesRequested, ["1", "1", "1", "1"]);
   });
 
   it("Mock findNearbyCats failing returns 502 with the generic error message", async () => {

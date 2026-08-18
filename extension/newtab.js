@@ -173,14 +173,21 @@ async function resolveLocation(settings, promptForLocation) {
   return /^\d{5}$/.test(settings.postalcode || "") ? { postalcode: settings.postalcode } : null;
 }
 
+function sameLocation(a, b) {
+  return Boolean(a) && Boolean(b) && JSON.stringify(a) === JSON.stringify(b);
+}
+
 async function refresh(location) {
   const { feedCache } = await storageGet(["feedCache"]);
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
-  const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location }), signal: AbortSignal.timeout(10_000) });
+  const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
+  const page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
+  const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, page }), signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
   const feed = await response.json();
-  const seenIds = getSeenIds(feedCache);
-  const nextCache = { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, seenIds };
+  // A refresh always fetches a distinct page/location, so previous seenIds
+  // never correspond to this batch of cards — start unseen tracking over.
+  const nextCache = { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, location, page, seenIds: [] };
   await storageSet({ feedCache: nextCache });
   if (!feed.cards?.length) {
     setCardVisible(false);
@@ -188,7 +195,7 @@ async function refresh(location) {
     showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
     return;
   }
-  const { selected, nextSeenIds } = nextCard(feed.cards, seenIds);
+  const { selected, nextSeenIds } = nextCard(feed.cards, []);
   const finalCache = { ...nextCache, seenIds: nextSeenIds };
   await storageSet({ feedCache: finalCache });
   $("location-panel").hidden = true;
@@ -219,7 +226,9 @@ async function _start({ requestLocation = false } = {}) {
     return;
   }
   $("location-panel").hidden = true;
-  if (age >= FRESH_MS || !feedCache?.cards?.length) {
+  const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
+  const shouldRefresh = !feedCache?.cards?.length || age >= STALE_MS || (age >= FRESH_MS && seenRatio >= 0.5);
+  if (shouldRefresh) {
     try { await refresh(location); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
