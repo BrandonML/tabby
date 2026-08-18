@@ -3,3 +3,6 @@ node_modules/
 *.diff
 .claude/worktrees/
 dist/
+.env
+.env.*
+!.env.example
