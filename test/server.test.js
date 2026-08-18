@@ -35,7 +35,7 @@ describe("server cache", () => {
     const makeRequest = (zip) => {
       return new Promise((resolve, reject) => {
         const req = http.request({
-          hostname: 'localhost',
+          hostname: '127.0.0.1',
           port: port,
           path: '/api/nearby-cats',
           method: 'POST',
@@ -53,13 +53,22 @@ describe("server cache", () => {
       });
     };
 
-    // Make 500 requests
-    // We can do them in batches or sequentially. Promise.all is fast.
-    const initialPromises = [];
-    for (let i = 0; i < 500; i++) {
-      initialPromises.push(makeRequest(String(10000 + i)));
+    // Make requests in bounded-concurrency batches rather than all 500 (plus
+    // the later 5) at once — firing hundreds of simultaneous loopback
+    // connections reliably triggers OS-level connection refusals on this
+    // Windows environment. A batch is small enough to stay well under
+    // whatever that ceiling is, while still large enough that entries
+    // within a batch land in the cache in close-to-issue-order (the exact
+    // ordering the assertions below depend on).
+    const BATCH_SIZE = 25;
+    async function makeRequestsInBatches(zips) {
+      for (let i = 0; i < zips.length; i += BATCH_SIZE) {
+        await Promise.all(zips.slice(i, i + BATCH_SIZE).map(makeRequest));
+      }
     }
-    await Promise.all(initialPromises);
+
+    // Make 500 requests
+    await makeRequestsInBatches(Array.from({ length: 500 }, (_, i) => String(10000 + i)));
 
     assert.strictEqual(cache.size, 500);
 
@@ -67,11 +76,7 @@ describe("server cache", () => {
     await makeRequest("10000");
 
     // Now add 5 more
-    const overflowPromises = [];
-    for (let i = 500; i < 505; i++) {
-      overflowPromises.push(makeRequest(String(10000 + i)));
-    }
-    await Promise.all(overflowPromises);
+    await makeRequestsInBatches(Array.from({ length: 5 }, (_, i) => String(10500 + i)));
 
     assert.strictEqual(cache.size, 500);
 
@@ -106,7 +111,7 @@ describe("server routing and behavior", () => {
 
   const request = (options, body = null) => {
     return new Promise((resolve, reject) => {
-      const req = http.request({ ...options, hostname: 'localhost', port }, (res) => {
+      const req = http.request({ ...options, hostname: '127.0.0.1', port }, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => resolve({ res, data }));
