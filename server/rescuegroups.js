@@ -1,6 +1,6 @@
 const BASE_URL = "https://api.rescuegroups.org/v5";
 const CONTENT_TYPE = "application/vnd.api+json";
-const RADIUS_STEPS = [10, 25, 50, 100];
+const RADIUS_STEPS = [25, 75, 150, 250];
 const MAX_LIMIT = 100;
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -145,12 +145,27 @@ export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch,
   return normalizeCards(payload);
 }
 
-export async function findNearbyCats(location, { apiKey, target = 8, fetchImpl = fetch, page = 1 } = {}) {
+export async function findNearbyCats(location, { apiKey, target = 40, fetchImpl = fetch, page = 1 } = {}) {
+  // Every step re-requests the same `page`, and RescueGroups sorts
+  // nearest-first, so a wider radius's results substantially overlap the
+  // narrower step's — they are not a disjoint additional batch. Dedup by id
+  // as each step is appended, and gate escalation on the cumulative unique
+  // count (not each step's own raw count), or duplicate animals would be
+  // double-counted and double-cached.
+  const seenIds = new Set();
+  let accumulated = [];
+  let radiusMiles = RADIUS_STEPS[0];
   for (const miles of RADIUS_STEPS) {
     const cards = await searchRadius(location, miles, { apiKey, fetchImpl, page });
-    if (cards.length >= target || (cards.length > 0 && miles === RADIUS_STEPS.at(-1))) {
-      return { cards, radiusMiles: miles, exhausted: cards.length < target };
-    }
+    const freshCards = cards.filter((card) => !seenIds.has(card.id));
+    freshCards.forEach((card) => seenIds.add(card.id));
+    accumulated = accumulated.concat(freshCards);
+    radiusMiles = miles;
+    if (accumulated.length >= target || miles === RADIUS_STEPS.at(-1)) break;
   }
-  return { cards: [], radiusMiles: RADIUS_STEPS.at(-1), exhausted: true };
+  // Cards are appended in step order (closer radius first), so trimming to
+  // the first MAX_LIMIT naturally keeps the closest results and only
+  // truncates the tail contributed by the farthest step queried.
+  const cards = accumulated.length > MAX_LIMIT ? accumulated.slice(0, MAX_LIMIT) : accumulated;
+  return { cards, radiusMiles, exhausted: accumulated.length < target };
 }

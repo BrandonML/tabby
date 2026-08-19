@@ -16,11 +16,13 @@ if (!process.env.RG_API_KEY) {
 const CONTENT_TYPE = "application/vnd.api+json";
 const API_KEY = process.env.RG_API_KEY;
 
-// A stable, high-population ZIP, searched at the widest radius step (100mi).
-// Confirmed by a live run: ~2494 cats available (page 1 returned exactly
-// MAX_LIMIT (25) results), so it reliably spans multiple pages.
+// A stable, high-population ZIP, searched at the widest radius step. As of
+// the [25, 75, 150, 250] ladder (Task 12/13), that's 250mi. Confirmed by an
+// earlier live run at the previous widest step (100mi): ~2494 cats
+// available, so it reliably spans multiple pages — a wider radius only adds
+// more results.
 const LOCATION = { postalcode: "10001" };
-const MILES = 100;
+const MILES = 250;
 
 // Confirmed pagination contract (live run against the location above):
 // - `page` is a plain scalar query param (e.g. page=2), NOT JSON:API-style
@@ -55,6 +57,18 @@ function idsOf(payload) {
   return (payload?.data || []).map((animal) => animal.id);
 }
 
+async function searchAtRadius(miles) {
+  const { url, body } = buildSearchRequest(LOCATION, miles);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: API_KEY, "Content-Type": CONTENT_TYPE, Accept: CONTENT_TYPE },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000)
+  });
+  const payload = await response.json().catch(() => null);
+  return { status: response.status, ok: response.ok, payload };
+}
+
 describe("RescueGroups live pagination contract", () => {
   it("page 1 and an explicit page 2 return non-overlapping id sets", async () => {
     const page1 = await searchPage();
@@ -83,5 +97,23 @@ describe("RescueGroups live pagination contract", () => {
     assert.ok(farPage.ok, `expected a 200, got ${farPage.status}: ${JSON.stringify(farPage.payload)}`);
     assert.deepEqual(idsOf(farPage.payload), [], "expected an empty results array for an out-of-range page");
     assert.equal(farPage.payload?.meta?.countReturned, 0);
+  });
+
+  // Task 12/13 sanity check: RescueGroups' docs don't specify a radius
+  // ceiling, so the new ladder's two largest steps (150mi, 250mi) are
+  // assumed valid but unverified against the live API until now.
+  it("the two largest ladder steps (150mi, 250mi) are accepted, not silently capped or rejected", async () => {
+    const mid = await searchAtRadius(150);
+    const wide = await searchAtRadius(250);
+
+    console.log("[live] 150mi status:", mid.status, "count:", mid.payload?.meta?.count);
+    console.log("[live] 250mi status:", wide.status, "count:", wide.payload?.meta?.count);
+
+    assert.ok(mid.ok, `150mi request failed: ${JSON.stringify(mid.payload)}`);
+    assert.ok(wide.ok, `250mi request failed: ${JSON.stringify(wide.payload)}`);
+    assert.ok(
+      (wide.payload?.meta?.count ?? 0) >= (mid.payload?.meta?.count ?? 0),
+      "a wider radius returned fewer total matches than a narrower one — the API may be silently capping the search radius"
+    );
   });
 });

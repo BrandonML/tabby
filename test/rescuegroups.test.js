@@ -3,21 +3,21 @@ import test from "node:test";
 import { buildSearchRequest, normalizeCards, validateLocation, searchRadius, findNearbyCats } from "../server/rescuegroups.js";
 
 test("ZIP fallback uses RescueGroups native postalcode radius filter", () => {
-  const request = buildSearchRequest({ postalcode: "33629" }, 10);
-  assert.deepEqual(request.body, { data: { filterRadius: { postalcode: "33629", miles: 10 } } });
+  const request = buildSearchRequest({ postalcode: "33629" }, 25);
+  assert.deepEqual(request.body, { data: { filterRadius: { postalcode: "33629", miles: 25 } } });
   assert.match(request.url, /available\/cats\/haspic/);
   assert.match(request.url, /sort=animals.distance/);
 });
 
 test("buildSearchRequest defaults to page 1 and uses the raised MAX_LIMIT of 100", () => {
-  const request = buildSearchRequest({ postalcode: "33629" }, 10);
+  const request = buildSearchRequest({ postalcode: "33629" }, 25);
   const url = new URL(request.url);
   assert.equal(url.searchParams.get("page"), "1");
   assert.equal(url.searchParams.get("limit"), "100");
 });
 
 test("buildSearchRequest sends page as a plain scalar query param, not JSON:API bracket-style", () => {
-  const request = buildSearchRequest({ postalcode: "33629" }, 10, 3);
+  const request = buildSearchRequest({ postalcode: "33629" }, 25, 3);
   const url = new URL(request.url);
   assert.equal(url.searchParams.get("page"), "3");
   assert.equal(url.searchParams.has("page[number]"), false);
@@ -25,7 +25,7 @@ test("buildSearchRequest sends page as a plain scalar query param, not JSON:API 
 });
 
 test("buildSearchRequest falls back to page 1 for a non-positive-integer page", () => {
-  const request = buildSearchRequest({ postalcode: "33629" }, 10, -5);
+  const request = buildSearchRequest({ postalcode: "33629" }, 25, -5);
   const url = new URL(request.url);
   assert.equal(url.searchParams.get("page"), "1");
 });
@@ -166,7 +166,7 @@ test("searchRadius throws error joining detail strings when payload has errors w
     })
   });
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 400: Invalid radius.; Invalid location./
   );
 });
@@ -180,7 +180,7 @@ test("searchRadius throws error joining title strings when payload has errors wi
     })
   });
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 401: Unauthorized access; Invalid token/
   );
 });
@@ -194,7 +194,7 @@ test("searchRadius throws error joining mixed detail and title strings", async (
     })
   });
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 403: Forbidden.; Account locked/
   );
 });
@@ -207,7 +207,7 @@ test("searchRadius throws error falling back to statusText when payload has no e
     json: async () => ({ someOtherField: true })
   });
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 500: Internal Server Error/
   );
 });
@@ -220,7 +220,7 @@ test("searchRadius throws error falling back to statusText when response is not 
     json: async () => { throw new Error("Unexpected token < in JSON"); }
   });
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl }),
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
     /RescueGroups HTTP 502: Bad Gateway/
   );
 });
@@ -266,40 +266,66 @@ function createFetchImpl(responsesByMiles) {
   return { fetchImpl, calls };
 }
 
-test("findNearbyCats stops at first radius if target is reached", async () => {
-  const { fetchImpl, calls } = createFetchImpl({ 10: 10 });
-  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+// createFetchImpl's mock (via createMockCards) assigns ids 0..count-1 for a
+// given step's raw response, which conveniently mirrors RescueGroups' real
+// nearest-first overlap: a wider radius's raw response reuses the same
+// low-numbered ids the narrower step already returned, plus new higher ones.
+// So `responsesByMiles[miles]` below is each step's *raw cumulative* count
+// straight from the API, and the *new unique* count (after dedup) is
+// `thisStep - previousStep`.
+
+test("findNearbyCats stops at the first radius once the default target (40) is reached", async () => {
+  const { fetchImpl, calls } = createFetchImpl({ 25: 49 }); // worked example: 25mi -> 49 unique, stop immediately
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", fetchImpl });
   assert.equal(result.exhausted, false);
-  assert.equal(result.radiusMiles, 10);
-  assert.equal(result.cards.length, 10);
-  assert.deepEqual(calls, [10]);
+  assert.equal(result.radiusMiles, 25);
+  assert.equal(result.cards.length, 49);
+  assert.deepEqual(calls, [25]);
 });
 
-test("findNearbyCats escalates radius until target is reached", async () => {
-  const { fetchImpl, calls } = createFetchImpl({ 10: 2, 25: 5, 50: 9 });
-  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+test("findNearbyCats escalates and dedupes overlapping results by cumulative unique count", async () => {
+  // Worked example: 25mi -> 31 unique (<40, continue). 75mi -> 42 new unique
+  // (73 cumulative, >=40, stop). The raw 75mi response is 73 (31 repeats + 42 new).
+  const { fetchImpl, calls } = createFetchImpl({ 25: 31, 75: 73 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", fetchImpl });
   assert.equal(result.exhausted, false);
-  assert.equal(result.radiusMiles, 50);
-  assert.equal(result.cards.length, 9);
-  assert.deepEqual(calls, [10, 25, 50]);
+  assert.equal(result.radiusMiles, 75);
+  assert.equal(result.cards.length, 73, "31 + 42 new unique, not 31 + 73 raw");
+  assert.deepEqual(calls, [25, 75]);
+  const ids = new Set(result.cards.map((c) => c.id));
+  assert.equal(ids.size, 73, "no duplicate ids across steps");
 });
 
-test("findNearbyCats exhausts all radii if target is never reached but finds some cats", async () => {
-  const { fetchImpl, calls } = createFetchImpl({ 10: 2, 25: 3, 50: 4, 100: 5 });
-  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+test("findNearbyCats trims a >100 cumulative result to 100, keeping the closer steps intact", async () => {
+  // Worked example: 25mi -> 8 unique (continue). 75mi -> 20 new (28 cumulative,
+  // continue). 150mi -> 112 new (140 cumulative, >=40, stop). 140 > 100, so
+  // trim to 100: all 28 from the closer two steps + the first 72 (of 112) from 150mi.
+  const { fetchImpl, calls } = createFetchImpl({ 25: 8, 75: 28, 150: 140 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", fetchImpl });
+  assert.equal(result.exhausted, false);
+  assert.equal(result.radiusMiles, 150);
+  assert.equal(result.cards.length, 100);
+  assert.deepEqual(calls, [25, 75, 150], "must not escalate to 250mi once trimmed cumulative already satisfies target");
+  const ids = result.cards.map((c) => Number(c.id)).sort((a, b) => a - b);
+  assert.deepEqual(ids, Array.from({ length: 100 }, (_, i) => i), "keeps ids 0-99: the full closer two steps plus the nearest 72 of the 150mi step");
+});
+
+test("findNearbyCats exhausts all radii if the target is never reached but finds some cats", async () => {
+  const { fetchImpl, calls } = createFetchImpl({ 25: 2, 75: 5, 150: 9, 250: 15 });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", fetchImpl });
   assert.equal(result.exhausted, true);
-  assert.equal(result.radiusMiles, 100);
-  assert.equal(result.cards.length, 5);
-  assert.deepEqual(calls, [10, 25, 50, 100]);
+  assert.equal(result.radiusMiles, 250);
+  assert.equal(result.cards.length, 15);
+  assert.deepEqual(calls, [25, 75, 150, 250]);
 });
 
 test("findNearbyCats returns empty and exhausted if no cats are found", async () => {
   const { fetchImpl, calls } = createFetchImpl({});
-  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", target: 8, fetchImpl });
+  const result = await findNearbyCats({ postalcode: "33629" }, { apiKey: "test", fetchImpl });
   assert.equal(result.exhausted, true);
-  assert.equal(result.radiusMiles, 100);
+  assert.equal(result.radiusMiles, 250);
   assert.equal(result.cards.length, 0);
-  assert.deepEqual(calls, [10, 25, 50, 100]);
+  assert.deepEqual(calls, [25, 75, 150, 250]);
 });
 
 test("searchRadius forwards the page option to the request URL", async () => {
@@ -308,7 +334,7 @@ test("searchRadius forwards the page option to the request URL", async () => {
     fetchUrl = url;
     return { ok: true, json: async () => createMockCards(0) };
   };
-  await searchRadius({ postalcode: "33629" }, 10, { apiKey: "test", fetchImpl, page: 4 });
+  await searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl, page: 4 });
   assert.equal(new URL(fetchUrl).searchParams.get("page"), "4");
 });
 
@@ -334,7 +360,7 @@ test("findNearbyCats defaults to page 1 when no page option is given", async () 
 
 test("searchRadius throws error if apiKey is not provided", async () => {
   await assert.rejects(
-    searchRadius({ postalcode: "33629" }, 10, {}),
+    searchRadius({ postalcode: "33629" }, 25, {}),
     /RG_API_KEY is not configured./
   );
 });
