@@ -157,6 +157,44 @@ test("normalizer rejects cards with malformed or unsafe imageUrl", () => {
   assert.deepEqual(cards, []);
 });
 
+function cardWithFee(adoptionFeeString) {
+  return normalizeCards({
+    data: [{ id: "1", attributes: { name: "Milo", updatedDate: new Date().toISOString(), adoptionFeeString }, relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } } }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Rescue" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/milo.jpg" } } }
+    ]
+  })[0].adoptionFee;
+}
+
+// Sampled live against the real RescueGroups API: bare numeric values need a
+// "$" prepended, already-priced/decorated and text-only values don't.
+test("normalizer prepends a missing $ to bare numeric adoption fees", () => {
+  assert.equal(cardWithFee("100"), "$100");
+  assert.equal(cardWithFee("150.00"), "$150.00");
+  assert.equal(cardWithFee("200 each"), "$200 each");
+  assert.equal(cardWithFee("100 for both"), "$100 for both");
+});
+
+test("normalizer leaves already-priced adoption fees untouched", () => {
+  assert.equal(cardWithFee("$150"), "$150");
+  assert.equal(cardWithFee("$50-100"), "$50-100");
+  assert.equal(cardWithFee("$125 each or $210 /pair"), "$125 each or $210 /pair");
+});
+
+test("normalizer leaves non-numeric adoption fee text untouched", () => {
+  assert.equal(cardWithFee("Donation"), "Donation");
+  assert.equal(cardWithFee("TBA"), "TBA");
+  assert.equal(cardWithFee("Waived"), "Waived");
+  assert.equal(cardWithFee("Sponsored"), "Sponsored");
+});
+
+test("normalizer maps a missing or blank adoption fee to null", () => {
+  assert.equal(cardWithFee(undefined), null);
+  assert.equal(cardWithFee(""), null);
+  assert.equal(cardWithFee("   "), null);
+});
+
 test("searchRadius throws error joining detail strings when payload has errors with detail", async () => {
   const fetchImpl = async () => ({
     ok: false,

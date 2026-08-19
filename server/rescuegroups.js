@@ -39,6 +39,20 @@ function isRecentEnough(value) {
   return Date.now() - time <= ONE_YEAR_MS;
 }
 
+// adoptionFeeString is free text from RescueGroups: sampled live, it ranges
+// from clean numbers ("100", "150.00") to already-prefixed/decorated values
+// ("$150", "$50-100", "200 each") to genuinely non-numeric text ("Donation",
+// "TBA", "Waived"). Prepending "$" only when the string has no currency
+// symbol and starts with a digit covers the numeric cases without touching
+// the text-only ones, which already read fine on their own.
+function normalizeAdoptionFee(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("$") || !/^\d/.test(trimmed)) return trimmed;
+  return `$${trimmed}`;
+}
+
 const ANIMAL_FIELDS = [
   "name", "ageString", "sex", "distance", "url", "pictureCount",
   "pictureThumbnailUrl", "breedString", "descriptionText", "isSpecialNeeds",
@@ -121,7 +135,7 @@ export function normalizeCards(payload) {
       rescueUrl,
       isAdoptionPending: Boolean(attrs.isAdoptionPending),
       isSpecialNeeds: Boolean(attrs.isSpecialNeeds),
-      adoptionFee: attrs.adoptionFeeString || null,
+      adoptionFee: normalizeAdoptionFee(attrs.adoptionFeeString),
       description: attrs.descriptionText || null,
       updatedAt
     };
