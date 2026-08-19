@@ -42,7 +42,7 @@ Also update `BACKEND_URL` in `extension/config.js` to the server's HTTPS endpoin
 npm.cmd test
 ```
 
-Before merging any pagination-related change (see Task 8 in `TASKS.md`), also run the live RescueGroups integration test once against the real API to confirm the pagination contract still holds. It requires a real `RG_API_KEY` (loaded from `.env`, same as `start:server`) and is excluded from `npm test`/CI by design:
+Run the live RescueGroups integration test once against the real API before merging any change to search radius, pagination, or the RescueGroups query contract, to confirm the pagination contract still holds. It requires a real `RG_API_KEY` (loaded from `.env`, same as `start:server`) and is excluded from `npm test`/CI by design:
 
 ```powershell
 npm.cmd run test:live
