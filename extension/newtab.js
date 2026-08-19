@@ -4,11 +4,16 @@ import { locationFromBrowser } from "./location.js";
 
 const FRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
-// A photo needs to be at least this much taller than wide before it's worth
-// switching to the taller, top-anchored "portrait" treatment — otherwise a
-// merely-near-square photo (e.g. 500x508) would get flagged for a trade-off
-// it doesn't need.
-const PORTRAIT_HEIGHT_RATIO = 1.1;
+// RescueGroups' photo height/width ratio is a continuous spread, not two
+// clusters (sampled live across 5 metros: ~52% land in 0.9-1.1, but the
+// portrait side alone stretches from 1.1 to 2.3+ with no natural gap) — a
+// single portrait/non-portrait split either overcrops the mild end or
+// undercrops the tall end. These two thresholds graduate the trade-off
+// instead: a merely-more-than-square photo (e.g. 500x508) stays on the
+// default crop, a moderately tall one gets a modestly taller top-anchored
+// box, and only the genuinely tall tail gets the full treatment.
+const MILD_PORTRAIT_HEIGHT_RATIO = 1.1;
+const TALL_PORTRAIT_HEIGHT_RATIO = 1.35;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
@@ -75,7 +80,7 @@ function showNotice(message, { linkText = null, linkAction = null } = {}) {
 
     button.addEventListener("click", (event) => {
       event.preventDefault();
-      if (linkAction === "open-settings") chrome.runtime.openOptionsPage();
+      if (linkAction === "open-settings") openSettings();
     });
 
     notice.appendChild(button);
@@ -110,11 +115,15 @@ function nextCard(cards, seenIds = []) {
   return { selected, nextSeenIds: [selected.id] };
 }
 
-function renderCard(card, { stale = false, exploreLabel = null } = {}) {
+function renderCard(card, { stale = false, exploreLabel = null, locationLabel = null } = {}) {
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(" · ");
   // While exploring, distanceMiles is measured from the explored city, not
   // the user — naming that city avoids the number reading as "from you".
-  const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${exploreLabel ? ` from ${exploreLabel}` : ""}` : null;
+  // In normal mode, locationLabel names what the distance is measured from
+  // instead (a saved ZIP, or "near you" when only browser geolocation is on
+  // file) — it arrives pre-phrased so callers can pick either wording.
+  const distanceSuffix = exploreLabel ? ` from ${exploreLabel}` : locationLabel ? ` ${locationLabel}` : "";
+  const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${distanceSuffix}` : null;
   const updatedAt = readingFormat(card.updatedAt);
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
@@ -138,11 +147,13 @@ function renderCard(card, { stale = false, exploreLabel = null } = {}) {
     // (RescueGroups' CDN only resizes proportionally, it can't hand us a
     // pre-cropped or face-centered variant). Trading some width for a
     // taller box and a top-anchored crop keeps the photo large and the
-    // subject's face/torso in frame, at the cost of some legs/tail. A
-    // tolerance keeps near-square photos (e.g. 500x508) on the regular
-    // crop — they're not portrait enough to be worth the trade-off.
-    if (img.naturalHeight > img.naturalWidth * PORTRAIT_HEIGHT_RATIO) {
+    // subject's face/torso in frame, at the cost of some legs/tail. See the
+    // MILD/TALL_PORTRAIT_HEIGHT_RATIO comment above for why this is two
+    // graduated tiers rather than one.
+    if (img.naturalHeight > img.naturalWidth * TALL_PORTRAIT_HEIGHT_RATIO) {
       img.classList.add("photo-portrait");
+    } else if (img.naturalHeight > img.naturalWidth * MILD_PORTRAIT_HEIGHT_RATIO) {
+      img.classList.add("photo-portrait-mild");
     }
   });
   cardContainer.appendChild(img);
@@ -236,7 +247,7 @@ function sameLocation(a, b) {
   return Boolean(a) && Boolean(b) && JSON.stringify(a) === JSON.stringify(b);
 }
 
-async function refresh(location) {
+async function refresh(location, locationLabel) {
   const { feedCache } = await storageGet(["feedCache"]);
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
   const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
@@ -258,7 +269,7 @@ async function refresh(location) {
   const finalCache = { ...nextCache, seenIds: nextSeenIds };
   await storageSet({ feedCache: finalCache });
   $("location-panel").hidden = true;
-  renderCard(selected);
+  renderCard(selected, { locationLabel });
 }
 
 async function _start({ requestLocation = false } = {}) {
@@ -268,11 +279,14 @@ async function _start({ requestLocation = false } = {}) {
     postalcode: settings.postalcode || "",
     location: settings.location || null
   };
+  const locationLabel = resolvedSettings.postalcode ? `from ${resolvedSettings.postalcode}` : "near you";
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
+  const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
+  const shouldRefresh = !feedCache?.cards?.length || age >= STALE_MS || (age >= FRESH_MS && seenRatio >= 0.5);
   if (feedCache?.cards?.length && age < STALE_MS) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
-    renderCard(selected, { stale: age >= FRESH_MS });
+    renderCard(selected, { stale: shouldRefresh, locationLabel });
   } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
     showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
   }
@@ -285,10 +299,8 @@ async function _start({ requestLocation = false } = {}) {
     return;
   }
   $("location-panel").hidden = true;
-  const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
-  const shouldRefresh = !feedCache?.cards?.length || age >= STALE_MS || (age >= FRESH_MS && seenRatio >= 0.5);
   if (shouldRefresh) {
-    try { await refresh(location); } catch (error) {
+    try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
       showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
@@ -349,13 +361,24 @@ function showAnotherExploreCard() {
   renderCard(selected, { exploreLabel: exploreBatch.label });
 }
 
-$("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
+function openSettings() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+    if (tab?.id) {
+      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("extension/options.html") });
+      return;
+    }
+    chrome.runtime.openOptionsPage();
+  });
+}
+
+$("settings").addEventListener("click", openSettings);
 $("use-location").addEventListener("click", async () => {
   $("location-panel").hidden = true;
   showNotice("Finding your location…");
   await start({ requestLocation: true });
 });
-$("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
+$("open-settings").addEventListener("click", openSettings);
 $("explore").addEventListener("click", async () => {
   showNotice("Exploring a new area…");
   await exploreArea();

@@ -36,7 +36,12 @@ describe('newtab.js DOM manipulation', () => {
         }
       },
       runtime: {
-        openOptionsPage: () => {}
+        openOptionsPage: () => {},
+        getURL: (path) => `chrome-extension://fake-id/${path}`
+      },
+      tabs: {
+        query: (_query, callback) => callback([{ id: 1 }]),
+        update: () => {}
       }
     };
 
@@ -112,7 +117,61 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(chips[1].textContent, "Special needs");
     assert.equal(chips[2].textContent, "$50");
   });
-  it('switches a portrait-oriented photo to the taller, top-anchored crop once it loads', () => {
+  describe('Settings buttons', () => {
+    it('#settings replaces the current tab with the options page instead of opening a new one', () => {
+      let updatedTabId, updatedProps;
+      window.chrome.tabs.update = (tabId, props) => { updatedTabId = tabId; updatedProps = props; };
+      let openedOptionsPage = false;
+      window.chrome.runtime.openOptionsPage = () => { openedOptionsPage = true; };
+
+      document.getElementById("settings").click();
+
+      assert.equal(updatedTabId, 1);
+      assert.equal(updatedProps.url, "chrome-extension://fake-id/extension/options.html");
+      assert.equal(openedOptionsPage, false);
+    });
+
+    it('#open-settings (shown in the "no cats found" notice) also replaces the current tab', () => {
+      let updatedProps;
+      window.chrome.tabs.update = (_tabId, props) => { updatedProps = props; };
+
+      document.getElementById("open-settings").click();
+
+      assert.equal(updatedProps.url, "chrome-extension://fake-id/extension/options.html");
+    });
+
+    it('falls back to openOptionsPage when there is no active tab to replace', () => {
+      window.chrome.tabs.query = (_query, callback) => callback([]);
+      let openedOptionsPage = false;
+      window.chrome.runtime.openOptionsPage = () => { openedOptionsPage = true; };
+
+      document.getElementById("settings").click();
+
+      assert.equal(openedOptionsPage, true);
+    });
+  });
+  describe('renderCard location label (normal mode)', () => {
+    it('shows the saved ZIP as the distance basis when locationLabel is "from <zip>"', () => {
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "from 97703" });
+      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away from 97703");
+    });
+
+    it('shows a "near you" fallback when locationLabel is set that way', () => {
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "near you" });
+      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away near you");
+    });
+
+    it('exploreLabel takes priority over locationLabel if both are somehow passed', () => {
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "near you", exploreLabel: "Chicago, IL" });
+      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away from Chicago, IL");
+    });
+
+    it('omits the basis entirely when no label is passed', () => {
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 });
+      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away");
+    });
+  });
+  it('switches a strongly portrait-oriented photo to the tall, top-anchored crop once it loads', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
@@ -123,6 +182,7 @@ describe('newtab.js DOM manipulation', () => {
     img.dispatchEvent(new window.Event('load'));
 
     assert.ok(img.classList.contains('photo-portrait'));
+    assert.equal(img.classList.contains('photo-portrait-mild'), false);
   });
   it('leaves a landscape or square photo on the default box and crop', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
@@ -133,6 +193,7 @@ describe('newtab.js DOM manipulation', () => {
     img.dispatchEvent(new window.Event('load'));
 
     assert.equal(img.classList.contains('photo-portrait'), false);
+    assert.equal(img.classList.contains('photo-portrait-mild'), false);
   });
   it('leaves a near-square photo (technically taller than wide, but not by much) on the default crop', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
@@ -145,17 +206,43 @@ describe('newtab.js DOM manipulation', () => {
     img.dispatchEvent(new window.Event('load'));
 
     assert.equal(img.classList.contains('photo-portrait'), false);
+    assert.equal(img.classList.contains('photo-portrait-mild'), false);
   });
-  it('switches to the portrait treatment once a photo clears the near-square tolerance', () => {
+  it('switches to the mild portrait treatment once a photo clears the near-square tolerance', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
-    // Just over the 1.1x tolerance (500 * 1.1 = 550) — pins the exact cutoff.
+    // Just over the 1.1x mild tolerance (500 * 1.1 = 550) — pins the exact cutoff.
     Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
     Object.defineProperty(img, 'naturalHeight', { value: 560, configurable: true });
     img.dispatchEvent(new window.Event('load'));
 
+    assert.ok(img.classList.contains('photo-portrait-mild'));
+    assert.equal(img.classList.contains('photo-portrait'), false, 'a mild portrait should not also get the tall treatment');
+  });
+  it('stays on the mild portrait treatment just under the tall-portrait threshold', () => {
+    window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+    const img = document.querySelector('.photo');
+    // Just under the 1.35x tall threshold (500 * 1.35 = 675).
+    Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 674, configurable: true });
+    img.dispatchEvent(new window.Event('load'));
+
+    assert.ok(img.classList.contains('photo-portrait-mild'));
+    assert.equal(img.classList.contains('photo-portrait'), false);
+  });
+  it('switches to the tall portrait treatment once a photo clears the tall-portrait threshold', () => {
+    window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+    const img = document.querySelector('.photo');
+    // Just over the 1.35x tall threshold (500 * 1.35 = 675).
+    Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 676, configurable: true });
+    img.dispatchEvent(new window.Event('load'));
+
     assert.ok(img.classList.contains('photo-portrait'));
+    assert.equal(img.classList.contains('photo-portrait-mild'), false, 'a tall portrait should not also carry the mild class');
   });
   it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
     assert.deepEqual(window.getSeenIds(null), []);
@@ -460,6 +547,8 @@ describe('newtab.js DOM manipulation', () => {
       const card = document.getElementById("card");
       assert.equal(card.hidden, false);
       assert.ok(['CatA', 'CatB'].includes(card.querySelector('h1').textContent));
+      // No refresh is actually happening, so the "while we refresh" notice must not show.
+      assert.equal(document.getElementById("notice").textContent, "");
     });
 
     it('refreshes once the hard STALE_MS cutoff is hit, even with a low seen ratio', async () => {
@@ -481,6 +570,51 @@ describe('newtab.js DOM manipulation', () => {
       await window.start();
 
       assert.equal(fetchCalled, true, 'the hard STALE_MS cutoff should force a refresh regardless of seen ratio');
+    });
+
+    it('shows the saved ZIP as the distance basis in normal mode after a refresh', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '97703', location: { lat: 1, lon: 2 } },
+        feedCache: null
+      });
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: '1', name: 'Cat1', distanceMiles: 4.2 }], radiusMiles: 10 })
+      });
+
+      await window.start();
+
+      assert.equal(document.querySelector('.distance').textContent, "4.2 mi away from 97703");
+    });
+
+    it('falls back to "near you" in normal mode when only browser-geolocation coordinates are on file', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '', location: { lat: 1, lon: 2 } },
+        feedCache: null
+      });
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [{ id: '1', name: 'Cat1', distanceMiles: 4.2 }], radiusMiles: 10 })
+      });
+
+      await window.start();
+
+      assert.equal(document.querySelector('.distance').textContent, "4.2 mi away near you");
+    });
+
+    it('shows the saved ZIP as the distance basis for a card served straight from cache', async () => {
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '97703', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1', distanceMiles: 4.2 }],
+          fetchedAt: Date.now() - (1000 * 60), // 1 min old (fresh)
+          seenIds: []
+        }
+      });
+
+      await window.start();
+
+      assert.equal(document.querySelector('.distance').textContent, "4.2 mi away from 97703");
     });
 
     it('shows no-location panel if no location', async () => {
