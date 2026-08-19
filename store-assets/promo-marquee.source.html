@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: "Fraunces";
+    src: url("http://localhost:4173/extension/fonts/fraunces.woff2") format("woff2");
+    font-weight: 400 700;
+    font-style: normal;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { min-width: 1500px; min-height: 700px; }
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    background: #e4e1d3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #tile {
+    position: relative;
+    width: 1400px;
+    height: 560px;
+    overflow: hidden;
+    background: #3f5d42;
+  }
+  .photo-side {
+    position: absolute;
+    top: 0; right: 0;
+    width: 620px;
+    height: 560px;
+    overflow: hidden;
+  }
+  .photo-side img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 25%;
+    display: block;
+  }
+  .photo-side::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 36px 0 60px -30px rgba(20, 30, 20, 0.55);
+  }
+  .text-side {
+    position: absolute;
+    top: 0; left: 0;
+    width: 780px;
+    height: 560px;
+    padding: 64px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .word {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 700;
+    font-size: 118px;
+    line-height: 1;
+    color: #f6efdd;
+    margin-bottom: 28px;
+  }
+  .tag {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 38px;
+    color: #f6efdd;
+    line-height: 1.35;
+    opacity: 0.94;
+    max-width: 560px;
+  }
+  .sub {
+    margin-top: 28px;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 19px;
+    color: #d8e4d8;
+    max-width: 480px;
+    line-height: 1.5;
+  }
+  .stamp {
+    margin-top: 36px;
+    display: inline-block;
+    align-self: flex-start;
+    font-family: ui-monospace, "IBM Plex Mono", "SF Mono", Consolas, monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #2c4230;
+    background: #f6efdd;
+    padding: 10px 18px;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+  <div id="tile">
+    <div class="text-side">
+      <div class="word">Tabby</div>
+      <div class="tag">Real adoptable cats.<br>One new tab at a time.</div>
+      <div class="sub">Every new tab shows a real, nearby adoptable cat sourced live from RescueGroups.org &mdash; search by ZIP code or location.</div>
+      <div class="stamp">New Tab Extension</div>
+    </div>
+    <div class="photo-side">
+      <img src="https://cataas.com/cat/0mxliw1UgtFdDkU8" alt="">
+    </div>
+  </div>
+</body>
+</html>
