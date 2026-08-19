@@ -25,30 +25,17 @@
     overflow: hidden;
     background: #3f5d42;
   }
-  .photo-side {
+  .mascot {
     position: absolute;
-    top: 0; right: 0;
-    width: 620px;
-    height: 560px;
-    overflow: hidden;
-  }
-  .photo-side img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 50% 25%;
-    display: block;
-  }
-  .photo-side::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    box-shadow: inset 36px 0 60px -30px rgba(20, 30, 20, 0.55);
+    right: 40px;
+    bottom: 0;
+    height: 520px;
+    width: auto;
   }
   .text-side {
     position: absolute;
     top: 0; left: 0;
-    width: 780px;
+    width: 760px;
     height: 560px;
     padding: 64px 72px;
     display: flex;
@@ -101,13 +88,34 @@
   <div id="tile">
     <div class="text-side">
       <div class="word">Tabby</div>
-      <div class="tag">Real adoptable cats.<br>One new tab at a time.</div>
+      <div class="tag">Real adoptable cats.<br>Every new tab.</div>
       <div class="sub">Every new tab shows a real, nearby adoptable cat sourced live from RescueGroups.org &mdash; search by ZIP code or location.</div>
       <div class="stamp">New Tab Extension</div>
     </div>
-    <div class="photo-side">
-      <img src="https://cataas.com/cat/0mxliw1UgtFdDkU8" alt="">
-    </div>
+    <svg class="mascot" viewBox="30 10 370 375" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 278 325 Q 384 300 366 185 Q 358 128 308 106" stroke="#f6efdd" stroke-width="36" stroke-linecap="round" fill="none"/>
+      <path d="M 70 365 L 70 230 C 70 140 125 90 195 90 C 265 90 320 140 320 230 L 320 365 Q 320 385 300 385 L 90 385 Q 70 385 70 365 Z" fill="#f6efdd" stroke="#2c4230" stroke-width="6"/>
+      <path d="M 384 300 Q 384 300 366 185 Q 358 128 308 106" stroke="#2c4230" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M 112 100 L 92 28 L 162 82 Z" fill="#f6efdd" stroke="#2c4230" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M 278 100 L 298 28 L 228 82 Z" fill="#f6efdd" stroke="#2c4230" stroke-width="6" stroke-linejoin="round"/>
+      <circle cx="195" cy="150" r="95" fill="#f6efdd" stroke="#2c4230" stroke-width="6"/>
+      <path d="M 158 65 Q 170 88 164 106" stroke="#3f5d42" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M 195 58 Q 195 82 195 100" stroke="#3f5d42" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M 232 65 Q 220 88 226 106" stroke="#3f5d42" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M 148 155 Q 165 138 182 155" stroke="#2a2620" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M 208 155 Q 225 138 242 155" stroke="#2a2620" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M 186 178 L 204 178 L 195 191 Z" fill="#b23a2e"/>
+      <path d="M 195 191 L 195 199 Q 195 210 179 206" stroke="#2a2620" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <path d="M 195 199 Q 195 210 211 206" stroke="#2a2620" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <path d="M 108 174 L 55 163" stroke="#2a2620" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 108 185 L 55 191" stroke="#2a2620" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 282 174 L 335 163" stroke="#2a2620" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 282 185 L 335 191" stroke="#2a2620" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="140" cy="345" rx="32" ry="26" fill="#f6efdd" stroke="#2c4230" stroke-width="6"/>
+      <ellipse cx="250" cy="345" rx="32" ry="26" fill="#f6efdd" stroke="#2c4230" stroke-width="6"/>
+      <path d="M 140 345 L 140 325" stroke="#2c4230" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 250 345 L 250 325" stroke="#2c4230" stroke-width="3" stroke-linecap="round"/>
+    </svg>
   </div>
 </body>
 </html>
