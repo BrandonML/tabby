@@ -135,7 +135,7 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .distance { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 400; color: var(--moss-dark); margin: 0 0 0.25rem; }
 .updated { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-soft); margin: 0 0 1rem; }
 
-.rescue { font-size: 0.8125rem; font-weight: 400; color: var(--ink); margin: 0 0 1.125rem; }
+.rescue { font-size: 0.8125rem; font-weight: 400; color: var(--ink); margin: 0 0 1.375rem; }
 .rescue a { color: var(--moss-dark); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
 
 .profile {
