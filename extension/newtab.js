@@ -268,14 +268,30 @@ function sameLocation(a, b) {
   return Boolean(a) && Boolean(b) && JSON.stringify(a) === JSON.stringify(b);
 }
 
-async function refresh(location, locationLabel) {
-  const { feedCache } = await storageGet(["feedCache"]);
+async function fetchCatsPage(location, page) {
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
-  const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
-  const page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
   const response = await fetch(`${backendUrl}/api/nearby-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, page }), signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not refresh cats.");
-  const feed = await response.json();
+  return response.json();
+}
+
+async function refresh(location, locationLabel) {
+  const { feedCache } = await storageGet(["feedCache"]);
+  const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
+  let page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
+  let feed = await fetchCatsPage(location, page);
+  // `exhausted` means this page's cumulative unique count (across the radius
+  // ladder) fell short of the target — it can still carry a non-empty page.
+  // Only an exhausted page that's also empty means we've paged past the end
+  // of what this location has, as opposed to this location having nothing at
+  // all (which page 1 coming back empty+exhausted would mean). In that case,
+  // restart pagination at page 1 rather than dead-ending on "no cats found"
+  // — the location isn't out of cats, just out of new pages. seenIds resets
+  // below regardless, so previously-seen cards are allowed to reappear.
+  if (!feed.cards?.length && feed.exhausted && page > 1) {
+    page = 1;
+    feed = await fetchCatsPage(location, page);
+  }
   // A refresh always fetches a distinct page/location, so previous seenIds
   // never correspond to this batch of cards — start unseen tracking over.
   const nextCache = { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, location, page, seenIds: [] };

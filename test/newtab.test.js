@@ -438,6 +438,63 @@ describe('newtab.js DOM manipulation', () => {
       assert.ok(notice.classList.contains('notice-error'), "an empty-results notice needs the user to act, so it should read as an error");
     });
 
+    it('resets to page 1 when a later page comes back exhausted and empty', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: { cards: [{ id: '1' }], fetchedAt: Date.now(), location: { postalcode: '12345' }, page: 4, seenIds: ['1'] }
+      });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      const requestedPages = [];
+      window.fetch = async (url, opts) => {
+        const { page } = JSON.parse(opts.body);
+        requestedPages.push(page);
+        if (page === 5) return { ok: true, json: async () => ({ cards: [], radiusMiles: 250, exhausted: true }) };
+        return { ok: true, json: async () => ({ cards: [{ id: 'p1cat', name: 'Cat1' }], radiusMiles: 250, exhausted: true }) };
+      };
+
+      await window.refresh({ postalcode: '12345' });
+
+      assert.deepEqual(requestedPages, [5, 1], 'page 5 came back empty+exhausted, so it should retry at page 1');
+      assert.equal(savedCache.page, 1);
+      assert.equal(savedCache.cards.length, 1);
+      const card = document.getElementById("card");
+      assert.equal(card.hidden, false, 'a successful page-1 retry should render a card, not the dead-end notice');
+    });
+
+    it('does not retry and shows the dead-end notice when page 1 itself is exhausted and empty', async () => {
+      window.chrome.storage.local.get = async () => ({ feedCache: null });
+      const requestedPages = [];
+      window.fetch = async (url, opts) => {
+        requestedPages.push(JSON.parse(opts.body).page);
+        return { ok: true, json: async () => ({ cards: [], radiusMiles: 250, exhausted: true }) };
+      };
+
+      await window.refresh({ postalcode: '99999' });
+
+      assert.deepEqual(requestedPages, [1], 'page 1 empty+exhausted means no cats anywhere nearby, not a pagination overrun — no retry');
+      const card = document.getElementById("card");
+      const notice = document.getElementById("notice");
+      assert.equal(card.hidden, true);
+      assert.ok(notice.textContent.includes('No available cats'));
+    });
+
+    it('does not retry when a later page is empty but not exhausted', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: { cards: [{ id: '1' }], fetchedAt: Date.now(), location: { postalcode: '12345' }, page: 2, seenIds: ['1'] }
+      });
+      const requestedPages = [];
+      window.fetch = async (url, opts) => {
+        requestedPages.push(JSON.parse(opts.body).page);
+        return { ok: true, json: async () => ({ cards: [], radiusMiles: 250, exhausted: false }) };
+      };
+
+      await window.refresh({ postalcode: '12345' });
+
+      assert.deepEqual(requestedPages, [3], 'not exhausted means this is just a gap page, not the end of pagination — no retry');
+      const notice = document.getElementById("notice");
+      assert.ok(notice.textContent.includes('No available cats'));
+    });
+
     it('throws error on failure', async () => {
       window.fetch = async () => ({
         ok: false,
