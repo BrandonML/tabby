@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+node_modules
+extension
+test
+test-live
+store-assets
+tasks
+*.md
