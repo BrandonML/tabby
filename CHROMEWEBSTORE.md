@@ -5,17 +5,26 @@
 ## Store Listing
 
 **Extension Name** [REQUIRED]
-Tabby - Nearby Adoptable Cats New Tab
-<!-- Matches manifest.json "name" (37 chars). "Tabby" kept per instruction; added "New Tab" — a
-     major search term for this category — and kept "Adoptable" prominent. A live Chrome Web
-     Store name search turned up existing "Tabby Cat" and "Tabby Cats Extension" listings, both
-     virtual/decorative cat companions, not real adoption listings — "Adoptable" is what
-     differentiates Tabby from those. -->
+Tabby: New Tab for Adoptable Cats
+<!-- Matches manifest.json "name" (33 chars). "Tabby" kept per instruction. Researched real "new
+     tab" category listings on the live store: "New Tab" appears in 7 of 9 sampled titles,
+     including the top-rated/featured ones ("Infinity New Tab" 4.9★, "Awesome New Tab Page"
+     4.3★, "Custom New Tab" 4.2★) — it's a load-bearing keyword in this category, kept
+     intentionally. Word order follows the observed convention of [brand/descriptor] + "New Tab"
+     as a clean suffix, rather than piling adjectives in front of it (the earlier version had
+     "Cats New Tab" colliding awkwardly). "Adoptable" stays prominent for the same reason as
+     before — differentiates from the existing "Tabby Cat" / "Tabby Cats Extension" virtual-pet
+     listings found in an earlier search. -->
 
 
 **Short Description** [REQUIRED]
-Shows one real, nearby adoptable cat from RescueGroups.org on every new tab. Search by location or ZIP code.
-<!-- 108 chars. Matches manifest.json "description" (this field doubles as both). -->
+See one real, nearby adoptable cat on every new tab.
+<!-- 52 chars (down from 108). Matches manifest.json "description" (this field doubles as both).
+     Trimmed the trailing mechanism detail ("from RescueGroups.org... Search by location or ZIP
+     code") — that's better placed in the full description, where it already appears. Kept
+     "real" and "nearby" since those are the two words that actually differentiate Tabby from
+     stock-photo/virtual-pet competitors; verb-led per CWS's own "start with a verb or the
+     extension's function" guidance. -->
 
 
 **Detailed Description** [REQUIRED]
