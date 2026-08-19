@@ -135,7 +135,7 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .distance { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 400; color: var(--moss-dark); margin: 0 0 0.25rem; }
 .updated { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-soft); margin: 0 0 1rem; }
 
-.rescue { font-size: 0.8125rem; font-weight: 400; color: var(--ink); margin: 0 0 1.125rem; }
+.rescue { font-size: 0.8125rem; font-weight: 400; color: var(--ink); margin: 0 0 1.375rem; }
 .rescue a { color: var(--moss-dark); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
 
 .profile {
@@ -167,9 +167,13 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .location-actions .secondary { background: transparent; color: var(--moss-dark); padding: 0; font-weight: 600; text-align: center; }
 .location-actions .secondary:hover { background: transparent; text-decoration: underline; }
 
-form { display: flex; gap: 8px; align-items: end; margin-top: 16px; }
+form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.or-divider { text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0; }
+.zip-field { display: flex; gap: 8px; align-items: end; }
+.zip-input-wrap { flex: 1; }
 label { display: block; font-size: 13px; font-weight: 700; }
-input { display: block; width: 145px; padding: 10px; margin-top: 4px; border: 1px solid var(--card-edge); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
+.label-optional { font-weight: 400; color: var(--ink-soft); }
+input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--card-edge); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
 
 .notice {
   min-height: 1.3em;
@@ -184,6 +188,7 @@ input { display: block; width: 145px; padding: 10px; margin-top: 4px; border: 1p
 .notice.notice-error { color: var(--stamp); }
 .notice a { color: inherit; }
 .notice-link { color: var(--moss-dark); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; background: none; border: none; padding: 0; cursor: pointer; font: inherit; }
+.notice-link:hover { background: none; }
 
 #explore-banner {
   border-bottom: 1px dashed var(--card-edge);

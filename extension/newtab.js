@@ -129,7 +129,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   // While exploring, distanceMiles is measured from the explored city, not
   // the user — naming that city avoids the number reading as "from you".
   // In normal mode, locationLabel names what the distance is measured from
-  // instead (a saved ZIP, or "near you" when only browser geolocation is on
+  // instead (a saved ZIP, or "from you" when only browser geolocation is on
   // file) — it arrives pre-phrased so callers can pick either wording.
   const distanceSuffix = exploreLabel ? ` from ${exploreLabel}` : locationLabel ? ` ${locationLabel}` : "";
   const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${distanceSuffix}` : null;
@@ -300,7 +300,7 @@ async function _start({ requestLocation = false } = {}) {
     postalcode: settings.postalcode || "",
     location: settings.location || null
   };
-  const locationLabel = resolvedSettings.postalcode ? `from ${resolvedSettings.postalcode}` : "near you";
+  const locationLabel = resolvedSettings.postalcode ? `from ${resolvedSettings.postalcode}` : "from you";
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
   const shouldRefresh = !feedCache?.cards?.length || age >= STALE_MS || (age >= FRESH_MS && seenRatio >= 0.5);
