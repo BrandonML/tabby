@@ -318,4 +318,27 @@ describe("server routing and behavior", () => {
     assert.strictEqual(logPayload.status, 502);
     assert.strictEqual(logPayload.message, "Raw upstream crash");
   });
+
+  it("RescueGroups rejecting an unrecognized ZIP returns 400 with the real detail, not a generic 502", async () => {
+    process.env.RG_API_KEY = "test-key";
+    mock.method(global, 'fetch', async () => ({
+      ok: false,
+      status: 400,
+      statusText: "Bad Request",
+      json: async () => ({ errors: [{ detail: "97703 is not a recognized postalcode" }] })
+    }));
+    const errorSpy = mock.method(console, 'error', () => {});
+
+    const { res, data } = await request(
+      { path: '/api/nearby-cats', method: 'POST' },
+      JSON.stringify({ location: { postalcode: "97703" } })
+    );
+
+    assert.strictEqual(res.statusCode, 400);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "RescueGroups HTTP 400: 97703 is not a recognized postalcode");
+    assert.strictEqual(errorSpy.mock.callCount(), 1);
+    const [, logPayload] = errorSpy.mock.calls[0].arguments;
+    assert.strictEqual(logPayload.status, 400);
+  });
 });

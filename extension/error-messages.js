@@ -1,5 +1,5 @@
 export function classifyRefreshError(message) {
-  const isInvalidZip = /five-digit|postal code|zip code|invalid/i.test(message);
+  const isInvalidZip = /five-digit|postal ?code|zip code|invalid/i.test(message);
 
   if (isInvalidZip) {
     return "That ZIP code looks invalid. Please update it.";

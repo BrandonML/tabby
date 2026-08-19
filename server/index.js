@@ -81,6 +81,7 @@ export const server = createServer(async (request, response) => {
     if (error.message === "Payload too large") status = 413;
     else if (error.message === "Request timeout") status = 408;
     else if (error instanceof SyntaxError || /Provide a five-digit|location is required/.test(error.message)) status = 400;
+    else if (/not a recognized postalcode/i.test(error.message)) status = 400;
 
     console.error("[tabby-server]", {
       status,
