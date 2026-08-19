@@ -34,7 +34,7 @@ Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a ne
 - `ALLOW_ORIGIN` — the installed extension's exact `chrome-extension://<id>` origin, not `*`.
 - `NODE_ENV=production` — currently gates stack-trace logging; a follow-up change will also use it to select the production RescueGroups API endpoint instead of the dev/sandbox one.
 
-Also update `BACKEND_URL` in `extension/config.js` to the server's HTTPS endpoint before packaging a release. The in-memory cache is suitable for local development; replace it with a bounded shared cache (for example, KV/Redis) for multi-instance production.
+Also update `BACKEND_URL` in `extension/config.js` to the server's HTTPS endpoint before packaging a release. The in-memory cache is correct as-is for the intended deployment target: a single persistent Node process (for example Render, Railway, or Fly.io). It would need to be replaced with a shared cache (for example KV/Redis) only if the server is ever scaled to multiple concurrent instances, or moved to a serverless/edge platform (Vercel functions, Cloudflare Workers) where in-process state isn't reliably shared or persistent between requests — those platforms would also require restructuring `server/index.js` away from its current `node:http` `createServer` model.
 
 ## Validation
 
