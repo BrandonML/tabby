@@ -156,6 +156,13 @@ export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch,
     const details = payload?.errors?.map((item) => item.detail || item.title).join("; ") || response.statusText;
     throw new Error(`RescueGroups HTTP ${response.status}: ${details}`);
   }
+  // A 2xx status doesn't guarantee a parseable JSON:API body — an empty or
+  // non-JSON response here would otherwise reach normalizeCards() as null
+  // and crash on `payload.included`, rather than surfacing as the network
+  // error it actually is.
+  if (!payload || typeof payload !== "object") {
+    throw new Error(`RescueGroups HTTP ${response.status}: empty or malformed response body`);
+  }
   return normalizeCards(payload);
 }
 

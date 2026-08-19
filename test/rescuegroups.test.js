@@ -263,6 +263,19 @@ test("searchRadius throws error falling back to statusText when response is not 
   );
 });
 
+test("searchRadius throws a clear error instead of crashing when a 2xx response has an empty or malformed body", async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    json: async () => { throw new Error("Unexpected end of JSON input"); }
+  });
+  await assert.rejects(
+    searchRadius({ postalcode: "33629" }, 25, { apiKey: "test", fetchImpl }),
+    /RescueGroups HTTP 200: empty or malformed response body/
+  );
+});
+
 function createMockCards(count) {
   const data = [];
   for (let i = 0; i < count; i++) {
