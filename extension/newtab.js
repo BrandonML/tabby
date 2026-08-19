@@ -63,11 +63,20 @@ function showExploreBanner(label) {
 function hideExploreBanner() {
   $("explore-banner").hidden = true;
 }
-function showNotice(message, { linkText = null, linkAction = null } = {}) {
+function showNotice(message, { linkText = null, linkAction = null, type = "info" } = {}) {
   const notice = $("notice");
   if (!notice) return;
 
   notice.textContent = ""; // Clear existing content safely
+  notice.classList.toggle("notice-error", type === "error");
+  if (!message) return;
+
+  if (type === "error") {
+    const icon = document.createElement("span");
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "⚠";
+    notice.appendChild(icon);
+  }
 
   if (linkText && linkAction) {
     notice.appendChild(document.createTextNode(`${message} `));
@@ -87,7 +96,7 @@ function showNotice(message, { linkText = null, linkAction = null } = {}) {
     return;
   }
 
-  notice.textContent = message;
+  notice.appendChild(document.createTextNode(message));
 }
 function readingFormat(value) {
   if (!value) return "";
@@ -125,7 +134,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   const distanceSuffix = exploreLabel ? ` from ${exploreLabel}` : locationLabel ? ` ${locationLabel}` : "";
   const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${distanceSuffix}` : null;
   const updatedAt = readingFormat(card.updatedAt);
-  const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "" }, card.isSpecialNeeds && { label: "Special needs", className: "" }, card.adoptionFee && { label: card.adoptionFee, className: "adoption-fee" }].filter(Boolean);
+  const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "pending" }, card.isSpecialNeeds && { label: "Special needs", className: "special-needs" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
   const profileUrl = card.profileUrl;
 
@@ -139,7 +148,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   img.src = card.imageUrl;
   img.alt = card.name;
   img.referrerPolicy = "no-referrer";
-  img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat."); });
+  img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat.", { type: "error" }); });
   img.addEventListener("load", () => {
     // A portrait-oriented photo (taller than wide) can't fill the card's
     // full width without either cropping or shrinking down to fit beside
@@ -162,6 +171,11 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   content.className = "content";
 
   const h1 = document.createElement("h1");
+  // Long names (or names with extra text) can't be caught by CSS alone --
+  // wrapping and the vw-based clamp() in .name already absorb most of them,
+  // but a genuinely long one still reads better a size down than
+  // balance-wrapped at full size.
+  h1.className = card.name.length > 18 ? "name name-long" : "name";
   h1.textContent = card.name;
   content.appendChild(h1);
 
@@ -170,6 +184,25 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     metaP.className = "meta";
     metaP.textContent = meta;
     content.appendChild(metaP);
+  }
+
+  if (chips.length > 0) {
+    const chipsDiv = document.createElement("div");
+    chipsDiv.className = "chips";
+    for (const chip of chips) {
+      const chipSpan = document.createElement("span");
+      chipSpan.className = `chip ${chip.className}`;
+      chipSpan.textContent = chip.label;
+      chipsDiv.appendChild(chipSpan);
+    }
+    content.appendChild(chipsDiv);
+  }
+
+  if (card.adoptionFee) {
+    const feeP = document.createElement("p");
+    feeP.className = "fee";
+    feeP.textContent = card.adoptionFee;
+    content.appendChild(feeP);
   }
 
   if (distance) {
@@ -199,18 +232,6 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     rescueP.textContent = card.rescueName;
   }
   content.appendChild(rescueP);
-
-  if (chips.length > 0) {
-    const chipsDiv = document.createElement("div");
-    chipsDiv.className = "chips";
-    for (const chip of chips) {
-      const chipSpan = document.createElement("span");
-      chipSpan.className = `chip${chip.className ? ` ${chip.className}` : ""}`;
-      chipSpan.textContent = chip.label;
-      chipsDiv.appendChild(chipSpan);
-    }
-    content.appendChild(chipsDiv);
-  }
 
   if (profileUrl) {
     const profileA = document.createElement("a");
@@ -262,7 +283,7 @@ async function refresh(location, locationLabel) {
   if (!feed.cards?.length) {
     setCardVisible(false);
     $("location-panel").hidden = true;
-    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
+    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
     return;
   }
   const { selected, nextSeenIds } = nextCard(feed.cards, []);
@@ -288,13 +309,13 @@ async function _start({ requestLocation = false } = {}) {
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: shouldRefresh, locationLabel });
   } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
-    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings" });
+    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
   if (!location) {
     $("location-panel").hidden = false;
     if (requestLocation) {
-      showNotice("Unable to determine your location. Try entering a zip code instead.", { linkText: "zip code", linkAction: "open-settings" });
+      showNotice("Unable to determine your location. Try entering a zip code instead.", { linkText: "zip code", linkAction: "open-settings", type: "error" });
     }
     return;
   }
@@ -303,7 +324,7 @@ async function _start({ requestLocation = false } = {}) {
     try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
-      showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings" });
+      showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings", type: "error" });
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }
@@ -338,7 +359,7 @@ async function exploreArea() {
     if (!feed.cards?.length) {
       exploreBatch = null;
       hideExploreBanner();
-      showNotice(`No available cats were found near ${entry.label}. Try exploring again.`);
+      showNotice(`No available cats were found near ${entry.label}. Try exploring again.`, { type: "error" });
       return;
     }
     const { selected, nextSeenIds } = nextCard(feed.cards, []);
@@ -350,7 +371,7 @@ async function exploreArea() {
     console.error("[tabby]", error);
     exploreBatch = null;
     hideExploreBanner();
-    showNotice("Unable to explore that area right now. Try again.");
+    showNotice("Unable to explore that area right now. Try again.", { type: "error" });
   }
 }
 

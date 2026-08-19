@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tabby</title><link rel="stylesheet" href="newtab.css"></head>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tabby</title><link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="newtab.css"></head>
   <body>
     <main class="shell">
       <header>
-        <p class="eyebrow">TABBY</p>
+        <p class="wordmark">Tabby</p>
         <div class="header-actions">
           <button id="explore" class="quiet" type="button">Explore another area</button>
           <button id="settings" class="quiet">Settings</button>
@@ -19,8 +19,23 @@
           <button id="open-settings" class="secondary" type="button">or enter your zip code</button>
         </div>
       </section>
-      <p id="explore-banner" class="notice" role="status" hidden>Exploring near <span id="explore-label"></span>. <button id="show-another-explore-cat" class="notice-link" type="button">Show another cat</button> · <button id="back-to-my-area" class="notice-link" type="button">Back to my area</button></p>
+      <p id="explore-banner" class="notice" role="status" hidden><span class="explore-text">Exploring near <span id="explore-label"></span>.</span><span class="explore-links"><button id="show-another-explore-cat" class="notice-link" type="button">Show another cat</button> · <button id="back-to-my-area" class="notice-link" type="button">Back to my area</button></span></p>
       <p id="notice" class="notice" role="status"></p>
+      <footer class="footer">
+        <p class="tagline">One cat at a time.</p>
+        <p class="credit">Built by <a href="https://linke.ro/brandon" target="_blank" rel="noopener noreferrer">Brandon</a></p>
+        <p class="links">
+          <a href="https://github.com/BrandonML/tabby" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <span class="sep">·</span>
+          <a href="https://www.facebook.com/scivolette" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <span class="sep">·</span>
+          <a href="https://www.linkedin.com/in/scivolette/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <span class="sep">·</span>
+          <a href="https://buymeacoffee.com/scivolette" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+          <span class="sep">·</span>
+          <a href="https://github.com/BrandonML/tabby/issues" target="_blank" rel="noopener noreferrer">Report an issue</a>
+        </p>
+      </footer>
     </main>
     <script type="module" src="newtab.js"></script>
   </body>

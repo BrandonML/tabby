@@ -112,10 +112,53 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(card.querySelectorAll('img').length, 1);
 
     const chips = card.querySelectorAll('.chip');
-    assert.equal(chips.length, 3);
+    assert.equal(chips.length, 2, "adoption fee is its own line now, not a chip");
     assert.equal(chips[0].textContent, "Adoption pending");
+    assert.ok(chips[0].classList.contains('pending'));
     assert.equal(chips[1].textContent, "Special needs");
-    assert.equal(chips[2].textContent, "$50");
+    assert.ok(chips[1].classList.contains('special-needs'));
+
+    const fee = card.querySelector('.fee');
+    assert.equal(fee.textContent, "$50");
+  });
+  describe('renderCard long-name handling', () => {
+    it('adds the name-long modifier once the name passes 18 characters', () => {
+      window.renderCard({ name: "Sir Reginald Fluffington III" });
+      const h1 = document.querySelector('#card h1');
+      assert.ok(h1.classList.contains('name'));
+      assert.ok(h1.classList.contains('name-long'));
+    });
+
+    it('leaves short names on the default size', () => {
+      window.renderCard({ name: "Milo" });
+      const h1 = document.querySelector('#card h1');
+      assert.ok(h1.classList.contains('name'));
+      assert.equal(h1.classList.contains('name-long'), false);
+    });
+  });
+  describe('showNotice error vs. informational tone', () => {
+    it('defaults to informational: no notice-error class, no warning icon', () => {
+      window.showNotice("Finding your location…");
+      const notice = document.getElementById("notice");
+      assert.equal(notice.classList.contains('notice-error'), false);
+      assert.equal(notice.textContent, "Finding your location…");
+    });
+
+    it('marks error notices with notice-error and a visible warning icon', () => {
+      window.showNotice("Unable to refresh nearby cats right now.", { type: "error" });
+      const notice = document.getElementById("notice");
+      assert.ok(notice.classList.contains('notice-error'));
+      const icon = notice.querySelector('[aria-hidden="true"]');
+      assert.ok(icon, "expected an aria-hidden icon element");
+      assert.ok(notice.textContent.includes("Unable to refresh nearby cats right now."));
+    });
+
+    it('clears the notice-error class when a later info notice replaces an error one', () => {
+      window.showNotice("Something went wrong.", { type: "error" });
+      window.showNotice("Finding your location…");
+      const notice = document.getElementById("notice");
+      assert.equal(notice.classList.contains('notice-error'), false);
+    });
   });
   describe('Settings buttons', () => {
     it('#settings replaces the current tab with the options page instead of opening a new one', () => {
@@ -392,6 +435,7 @@ describe('newtab.js DOM manipulation', () => {
       const notice = document.getElementById("notice");
       assert.equal(card.hidden, true);
       assert.ok(notice.textContent.includes('No available cats'));
+      assert.ok(notice.classList.contains('notice-error'), "an empty-results notice needs the user to act, so it should read as an error");
     });
 
     it('throws error on failure', async () => {
