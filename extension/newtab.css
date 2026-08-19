@@ -167,9 +167,13 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .location-actions .secondary { background: transparent; color: var(--moss-dark); padding: 0; font-weight: 600; text-align: center; }
 .location-actions .secondary:hover { background: transparent; text-decoration: underline; }
 
-form { display: flex; gap: 8px; align-items: end; margin-top: 16px; }
+form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.or-divider { text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0; }
+.zip-field { display: flex; gap: 8px; align-items: end; }
+.zip-input-wrap { flex: 1; }
 label { display: block; font-size: 13px; font-weight: 700; }
-input { display: block; width: 145px; padding: 10px; margin-top: 4px; border: 1px solid var(--card-edge); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
+.label-optional { font-weight: 400; color: var(--ink-soft); }
+input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--card-edge); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
 
 .notice {
   min-height: 1.3em;
