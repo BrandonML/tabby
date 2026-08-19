@@ -145,10 +145,10 @@ Tabby does not execute any remotely hosted code. All JavaScript running in the e
 
 ## Privacy Policy
 
-**Privacy Policy URL** [REQUIRED] — ⚠️ NEEDS YOUR INPUT
-Drafted at `PRIVACY.md` in the repo root. Once merged to `main`, it's immediately usable at:
+**Privacy Policy URL** [REQUIRED]
 `https://github.com/BrandonML/tabby/blob/main/PRIVACY.md`
-That's a stable, publicly-accessible URL and is fine to submit as-is. If you'd rather have a cleaner-looking page, enabling GitHub Pages for this repo and publishing the same content there is a quick upgrade — let me know if you want that set up instead.
+<!-- Confirmed: GitHub blob URL. Live once PRIVACY.md is merged to main — verify it loads (not a 404)
+     before submitting, per the pre-publish checklist. -->
 
 
 ## Distribution
@@ -158,14 +158,12 @@ That's a stable, publicly-accessible URL and is fine to submit as-is. If you'd r
 
 ## Developer Info
 
-**Publisher Name** [REQUIRED] — ⚠️ NEEDS YOUR INPUT
-<!-- The footer in newtab.html credits "Brandon" (linke.ro/brandon) and links a GitHub account
-     "BrandonML" — I didn't want to assume which name (or a different public/business name
-     entirely) you want to appear publicly on the store listing, so left this open. -->
+**Publisher Name** [REQUIRED]
+BrandonML
 
 **Contact Email** [REQUIRED] — ⚠️ NEEDS YOUR INPUT
-<!-- Displayed publicly on the store listing — I'm not filling this in with an inferred address
-     without you confirming you want it public. -->
+<!-- Left open intentionally — displayed publicly on the store listing, so fill in whichever
+     address you're comfortable exposing and want to monitor for CWS policy notices. -->
 
 **Support URL / Email** [RECOMMENDED]
 https://github.com/BrandonML/tabby/issues
@@ -188,7 +186,7 @@ https://github.com/BrandonML/tabby
 ### Known Issues / Limitations
 - **`extension/config.js`'s `BACKEND_URL` is still `http://localhost:8787`.** Per the README, this must be updated to the deployed server's real HTTPS endpoint before packaging the release build — as it stands, a real user's install would try to talk to `localhost` and every search would fail. This has to happen before `npm run release` is run for the actual submission, not just before writing this document. Deploying the server and getting its permanent URL also has to happen *before* `ALLOW_ORIGIN` on that server can be locked down to the real `chrome-extension://<ID>` origin (which Chrome only assigns once the item exists in the dashboard) — see the README's "Production deployment" section for the full sequencing.
 - Screenshots/promo images use realistic sample data (see Screenshot Notes above) rather than a live capture against a real user's location, since this was generated in an automated environment without a live browsing session or real GPS location.
-- Category, Publisher Name, Contact Email, and the exact Privacy Policy hosting choice are flagged above as open items — everything else in this document should be ready to copy into the dashboard as-is.
+- Category is still flagged above as an open item (pick in-dashboard). Publisher Name and Privacy Policy hosting are now settled; Contact Email is intentionally left for you to fill in directly since it's published publicly.
 
 ### Rejection History
 None yet — first submission.
