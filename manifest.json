@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Tabby - Nearby Adoptable Cats",
+  "name": "Tabby - Nearby Adoptable Cats New Tab",
   "version": "0.1.0",
-  "description": "A cache-first new-tab experience for nearby adoptable cats.",
+  "description": "Shows one real, nearby adoptable cat from RescueGroups.org on every new tab. Search by location or ZIP code.",
   "permissions": ["storage", "geolocation"],
   "icons": {
     "16": "extension/icons/icon16.png",
