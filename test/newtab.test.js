@@ -199,13 +199,13 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(document.querySelector('.distance').textContent, "5.5 mi away from 97703");
     });
 
-    it('shows a "near you" fallback when locationLabel is set that way', () => {
-      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "near you" });
-      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away near you");
+    it('shows a "from you" fallback when locationLabel is set that way', () => {
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "from you" });
+      assert.equal(document.querySelector('.distance').textContent, "5.5 mi away from you");
     });
 
     it('exploreLabel takes priority over locationLabel if both are somehow passed', () => {
-      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "near you", exploreLabel: "Chicago, IL" });
+      window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "from you", exploreLabel: "Chicago, IL" });
       assert.equal(document.querySelector('.distance').textContent, "5.5 mi away from Chicago, IL");
     });
 
@@ -631,7 +631,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(document.querySelector('.distance').textContent, "4.2 mi away from 97703");
     });
 
-    it('falls back to "near you" in normal mode when only browser-geolocation coordinates are on file', async () => {
+    it('falls back to "from you" in normal mode when only browser-geolocation coordinates are on file', async () => {
       window.chrome.storage.local.get = async () => ({
         settings: { postalcode: '', location: { lat: 1, lon: 2 } },
         feedCache: null
@@ -643,7 +643,7 @@ describe('newtab.js DOM manipulation', () => {
 
       await window.start();
 
-      assert.equal(document.querySelector('.distance').textContent, "4.2 mi away near you");
+      assert.equal(document.querySelector('.distance').textContent, "4.2 mi away from you");
     });
 
     it('shows the saved ZIP as the distance basis for a card served straight from cache', async () => {
