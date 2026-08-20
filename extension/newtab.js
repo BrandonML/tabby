@@ -3,7 +3,11 @@ import { BACKEND_URL } from "./config.js";
 import { locationFromBrowser } from "./location.js";
 
 const FRESH_MS = 5 * 60 * 1000;
-const STALE_MS = 30 * 60 * 1000;
+// A refresh replaces only the *seen* cards in the pool (kept unseen ones
+// survive), so waiting until most of the pool has been shown just means
+// fewer, chunkier fetches — there's no accuracy cost to waiting, unlike the
+// old time-based cutoff this replaced (see git history on STALE_MS).
+const SEEN_REFRESH_RATIO = 0.85;
 // RescueGroups' photo height/width ratio is a continuous spread, not two
 // clusters (sampled live across 5 metros: ~52% land in 0.9-1.1, but the
 // portrait side alone stretches from 1.1 to 2.3+ with no natural gap) — a
@@ -275,34 +279,56 @@ async function fetchCatsPage(location, page) {
   return response.json();
 }
 
+// Appends the cards from `incomingCards` that aren't already in `keptCards`
+// or in `excludeIds` (cards the user has already seen and dropped) — used to
+// merge a freshly-fetched page into the kept unseen remainder without
+// duplicating anything or letting a seen card quietly sneak back in.
+function mergeCards(keptCards, incomingCards, excludeIds = []) {
+  const knownIds = new Set([...keptCards.map((card) => card.id), ...excludeIds]);
+  const freshCards = incomingCards.filter((card) => !knownIds.has(card.id));
+  return [...keptCards, ...freshCards];
+}
+
 async function refresh(location, locationLabel) {
   const { feedCache } = await storageGet(["feedCache"]);
   const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
+  const priorSeenIds = isRepeatLocation ? getSeenIds(feedCache) : [];
+  // Only the *seen* cards are dropped on a refresh — whatever the user
+  // hasn't looked at yet survives and is topped up with new cards below,
+  // rather than being discarded wholesale.
+  const keptUnseenCards = isRepeatLocation ? feedCache.cards.filter((card) => !priorSeenIds.includes(card.id)) : [];
   let page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
   let feed = await fetchCatsPage(location, page);
+  let mergedCards = mergeCards(keptUnseenCards, feed.cards || [], priorSeenIds);
+
   // `exhausted` means this page's cumulative unique count (across the radius
   // ladder) fell short of the target — it can still carry a non-empty page.
   // Only an exhausted page that's also empty means we've paged past the end
   // of what this location has, as opposed to this location having nothing at
   // all (which page 1 coming back empty+exhausted would mean). In that case,
   // restart pagination at page 1 rather than dead-ending on "no cats found"
-  // — the location isn't out of cats, just out of new pages. seenIds resets
-  // below regardless, so previously-seen cards are allowed to reappear.
+  // — the location isn't out of cats, just out of new pages. Previously-seen
+  // cards are allowed to resurface here (only the still-unseen leftovers are
+  // excluded, to avoid an immediate duplicate).
   if (!feed.cards?.length && feed.exhausted && page > 1) {
     page = 1;
     feed = await fetchCatsPage(location, page);
+    mergedCards = mergeCards(keptUnseenCards, feed.cards || []);
   }
-  // A refresh always fetches a distinct page/location, so previous seenIds
-  // never correspond to this batch of cards — start unseen tracking over.
-  const nextCache = { cards: feed.cards || [], fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || 0, location, page, seenIds: [] };
+
+  const nextCache = { cards: mergedCards, fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || feedCache?.radiusMiles || 0, location, page, seenIds: [] };
   await storageSet({ feedCache: nextCache });
-  if (!feed.cards?.length) {
+  if (!mergedCards.length) {
     setCardVisible(false);
     $("location-panel").hidden = true;
     showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
     return;
   }
-  const { selected, nextSeenIds } = nextCard(feed.cards, []);
+  // Every card in mergedCards is guaranteed unseen (seen ones were dropped,
+  // and the fetch was deduped against the prior seenIds), so seenIds starts
+  // empty here — carrying forward stale ids that no longer match any card in
+  // the pool would inflate _start()'s seen-ratio math against a phantom count.
+  const { selected, nextSeenIds } = nextCard(mergedCards, []);
   const finalCache = { ...nextCache, seenIds: nextSeenIds };
   await storageSet({ feedCache: finalCache });
   $("location-panel").hidden = true;
@@ -319,12 +345,12 @@ async function _start({ requestLocation = false } = {}) {
   const locationLabel = resolvedSettings.postalcode ? `from ${resolvedSettings.postalcode}` : "from you";
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
-  const shouldRefresh = !feedCache?.cards?.length || age >= STALE_MS || (age >= FRESH_MS && seenRatio >= 0.5);
-  if (feedCache?.cards?.length && age < STALE_MS) {
+  const shouldRefresh = !feedCache?.cards?.length || (age >= FRESH_MS && seenRatio >= SEEN_REFRESH_RATIO);
+  if (feedCache?.cards?.length) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: shouldRefresh, locationLabel });
-  } else if (feedCache && !feedCache.cards?.length && age < STALE_MS) {
+  } else if (feedCache && !feedCache.cards?.length) {
     showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
