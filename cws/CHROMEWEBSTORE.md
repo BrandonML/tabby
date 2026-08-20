@@ -47,7 +47,7 @@ HOW TO USE
 4. Click "Explore another area" to browse cats in other cities, or open Settings anytime to change your location.
 
 PRIVACY
-Tabby does not use ads, analytics, or trackers of any kind. Your location or ZIP code is used only to search for nearby cats and is stored on your device — Tabby never sells your data or shares it with third parties beyond what's needed to run that search (see the Privacy Policy link on this listing for full details).
+Tabby does not use ads or trackers. Basic, aggregate usage analytics (installs, active users) run through Chrome Web Store's own built-in GA4 integration — no analytics code ships in the extension itself. Your location or ZIP code is used only to search for nearby cats and is stored on your device — Tabby never sells your data or shares it with third parties beyond what's needed to run that search (see the Privacy Policy link on this listing for full details).
 
 PERMISSIONS
 "Storage" saves your ZIP code or location and your most recent cat listings locally on your device, so Tabby loads instantly on your next new tab.
@@ -83,13 +83,13 @@ English
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready (existing) | `extension/icons/icon128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `store-assets/screenshot-1-main-card.png` |
-| Screenshot 2 [RECOMMENDED] | 1280×800 | ✅ Ready | `store-assets/screenshot-2-explore.png` |
-| Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready | `store-assets/screenshot-3-first-run.png` |
-| Screenshot 4 | 1280×800 | ✅ Ready | `store-assets/screenshot-4-settings.png` |
-| Screenshot 5 | 1280×800 | ✅ Ready | `store-assets/screenshot-5-fee-tags.png` |
-| Small Promo Tile [RECOMMENDED] | 440×280 | ✅ Ready | `store-assets/small-promo-tile.png` |
-| Marquee Promo Tile | 1400×560 | ✅ Ready | `store-assets/marquee-promo-tile.png` |
+| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `screenshot-1-main-card.png` |
+| Screenshot 2 [RECOMMENDED] | 1280×800 | ✅ Ready | `screenshot-2-explore.png` |
+| Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready | `screenshot-3-first-run.png` |
+| Screenshot 4 | 1280×800 | ✅ Ready | `screenshot-4-settings.png` |
+| Screenshot 5 | 1280×800 | ✅ Ready | `screenshot-5-fee-tags.png` |
+| Small Promo Tile [RECOMMENDED] | 440×280 | ✅ Ready | `small-promo-tile.png` |
+| Marquee Promo Tile | 1400×560 | ✅ Ready | `marquee-promo-tile.png` |
 
 <!-- Status options: ⬜ Not created | 🟡 Needs update | ✅ Ready -->
 

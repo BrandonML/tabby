@@ -559,6 +559,100 @@ describe('newtab.js DOM manipulation', () => {
       assert.deepEqual(savedCache.location, { postalcode: '12345' });
       assert.equal(savedCache.page, 1);
     });
+
+    it('keeps unseen cards from the previous batch, drops seen ones, and merges in newly fetched cards', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1' }, { id: '2', name: 'Cat2' }, { id: '3', name: 'Cat3' }],
+          fetchedAt: Date.now(),
+          location: { postalcode: '12345' },
+          page: 1,
+          seenIds: ['1', '2'] // '3' is still unseen
+        }
+      });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: '4', name: 'Cat4' }, { id: '5', name: 'Cat5' }], radiusMiles: 25 }) });
+
+      await window.refresh({ postalcode: '12345' });
+
+      const ids = savedCache.cards.map((c) => c.id).sort();
+      assert.deepEqual(ids, ['3', '4', '5'], 'seen cards 1 and 2 are dropped; unseen card 3 survives; 4 and 5 are merged in');
+    });
+
+    it('does not let a card the fetch re-returns appear twice, or let a previously-seen card sneak back in', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1' }, { id: '2', name: 'Cat2' }],
+          fetchedAt: Date.now(),
+          location: { postalcode: '12345' },
+          page: 1,
+          seenIds: ['1'] // '2' is still unseen
+        }
+      });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      // The fetch re-returns both the already-seen card '1' and the
+      // still-kept unseen card '2', alongside one genuinely new card '3'.
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: '1', name: 'Cat1' }, { id: '2', name: 'Cat2' }, { id: '3', name: 'Cat3' }], radiusMiles: 25 }) });
+
+      await window.refresh({ postalcode: '12345' });
+
+      const ids = savedCache.cards.map((c) => c.id).sort();
+      assert.deepEqual(ids, ['2', '3'], 'card 1 must not reappear (already seen) and card 2 must not be duplicated');
+    });
+
+    it('does not inflate seenIds with stale entries after a merge, so the seen-ratio math stays accurate', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1' }, { id: '2', name: 'Cat2' }, { id: '3', name: 'Cat3' }],
+          fetchedAt: Date.now(),
+          location: { postalcode: '12345' },
+          page: 1,
+          seenIds: ['1', '2'] // '3' is still unseen
+        }
+      });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      window.fetch = async () => ({ ok: true, json: async () => ({ cards: [{ id: '4', name: 'Cat4' }, { id: '5', name: 'Cat5' }], radiusMiles: 25 }) });
+
+      await window.refresh({ postalcode: '12345' });
+
+      // Merged pool is ['3', '4', '5'] (3 cards); exactly one gets marked
+      // seen by nextCard() picking the card to display. seenIds must not
+      // carry forward the now-dropped '1'/'2' ids, or the ratio would read
+      // as artificially high against the new pool.
+      assert.equal(savedCache.seenIds.length, 1);
+      assert.ok(['3', '4', '5'].includes(savedCache.seenIds[0]));
+    });
+
+    it('preserves still-unseen leftovers even when the location fully exhausts and restarts at page 1', async () => {
+      window.chrome.storage.local.get = async () => ({
+        feedCache: {
+          cards: [{ id: '1', name: 'Cat1' }, { id: 'leftover', name: 'CatLeftover' }],
+          fetchedAt: Date.now(),
+          location: { postalcode: '12345' },
+          page: 4,
+          seenIds: ['1'] // 'leftover' is still unseen
+        }
+      });
+      let savedCache;
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      const requestedPages = [];
+      window.fetch = async (url, opts) => {
+        const { page } = JSON.parse(opts.body);
+        requestedPages.push(page);
+        if (page === 5) return { ok: true, json: async () => ({ cards: [], radiusMiles: 250, exhausted: true }) };
+        return { ok: true, json: async () => ({ cards: [{ id: 'restarted', name: 'CatRestarted' }], radiusMiles: 25, exhausted: true }) };
+      };
+
+      await window.refresh({ postalcode: '12345' });
+
+      assert.deepEqual(requestedPages, [5, 1]);
+      const ids = savedCache.cards.map((c) => c.id).sort();
+      assert.deepEqual(ids, ['leftover', 'restarted'], 'the never-shown leftover survives the restart alongside the fresh page-1 batch');
+      assert.equal(savedCache.page, 1);
+    });
   });
 
   describe('start', () => {
@@ -626,13 +720,15 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(card.querySelector('h1').textContent, 'CatFresh');
     });
 
-    it('does not refresh when stale-by-time but under half the cache has been seen', async () => {
+    it('does not refresh when under the seen-ratio threshold, no matter how old the cache is', async () => {
       window.chrome.storage.local.get = async () => ({
         settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
         feedCache: {
           cards: [{ id: '1', name: 'CatA' }, { id: '2', name: 'CatB' }],
-          fetchedAt: Date.now() - (1000 * 60 * 10), // 10 mins old (stale but valid, under STALE_MS)
-          seenIds: [] // 0 of 2 seen — under the 50% refresh threshold
+          // Very old — there's no hard time-based cutoff any more (removed
+          // along with STALE_MS; a refresh now only fires off the seen ratio).
+          fetchedAt: Date.now() - (1000 * 60 * 60 * 24),
+          seenIds: [] // 0 of 2 seen — well under the 85% refresh threshold
         }
       });
 
@@ -644,7 +740,7 @@ describe('newtab.js DOM manipulation', () => {
 
       await window.start();
 
-      assert.equal(fetchCalled, false, 'a stale-by-time cache with a low seen ratio should not trigger a background refresh');
+      assert.equal(fetchCalled, false, 'a low seen ratio should not trigger a background refresh, regardless of age');
       const card = document.getElementById("card");
       assert.equal(card.hidden, false);
       assert.ok(['CatA', 'CatB'].includes(card.querySelector('h1').textContent));
@@ -652,25 +748,45 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(document.getElementById("notice").textContent, "");
     });
 
-    it('refreshes once the hard STALE_MS cutoff is hit, even with a low seen ratio', async () => {
+    it('does not refresh at 70% seen — below the 85% threshold', async () => {
+      const cards = Array.from({ length: 10 }, (_, i) => ({ id: String(i), name: `Cat${i}` }));
       window.chrome.storage.local.get = async () => ({
         settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
         feedCache: {
-          cards: [{ id: '1', name: 'CatA' }, { id: '2', name: 'CatB' }],
-          fetchedAt: Date.now() - (1000 * 60 * 31), // 31 mins old — past STALE_MS
-          seenIds: [] // 0 of 2 seen, but the hard cutoff must still force a refresh
+          cards,
+          fetchedAt: Date.now() - (1000 * 60 * 10), // past FRESH_MS
+          seenIds: cards.slice(0, 7).map((c) => c.id) // 7 of 10 seen = 70%
+        }
+      });
+
+      let fetchCalled = false;
+      window.fetch = async () => { fetchCalled = true; return { ok: true, json: async () => ({ cards: [], radiusMiles: 10 }) }; };
+
+      await window.start();
+
+      assert.equal(fetchCalled, false, '70% seen is under the 85% threshold, so no refresh should fire');
+    });
+
+    it('refreshes once the seen ratio crosses 85%', async () => {
+      const cards = Array.from({ length: 10 }, (_, i) => ({ id: String(i), name: `Cat${i}` }));
+      window.chrome.storage.local.get = async () => ({
+        settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
+        feedCache: {
+          cards,
+          fetchedAt: Date.now() - (1000 * 60 * 10), // past FRESH_MS
+          seenIds: cards.slice(0, 9).map((c) => c.id) // 9 of 10 seen = 90%
         }
       });
 
       let fetchCalled = false;
       window.fetch = async () => {
         fetchCalled = true;
-        return { ok: true, json: async () => ({ cards: [{ id: '3', name: 'CatFresh' }], radiusMiles: 10 }) };
+        return { ok: true, json: async () => ({ cards: [{ id: 'new', name: 'NewCat' }], radiusMiles: 10 }) };
       };
 
       await window.start();
 
-      assert.equal(fetchCalled, true, 'the hard STALE_MS cutoff should force a refresh regardless of seen ratio');
+      assert.equal(fetchCalled, true, '90% seen crosses the 85% threshold and should trigger a refresh');
     });
 
     it('shows the saved ZIP as the distance basis in normal mode after a refresh', async () => {

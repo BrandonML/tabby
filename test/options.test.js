@@ -95,6 +95,12 @@ describe('options.js settings logic', () => {
     assert.equal(document.getElementById('zip').value, '90210');
   });
 
+  it('#saved starts hidden, with no reserved gap, before anything happens', () => {
+    const saved = document.getElementById('saved');
+    assert.equal(saved.hidden, true);
+    assert.equal(saved.textContent, '');
+  });
+
   it('validates ZIP format on submit', async () => {
     const zip = document.getElementById('zip');
     const form = document.getElementById('settings-form');
@@ -106,6 +112,7 @@ describe('options.js settings logic', () => {
     // Await microtasks
     await new Promise(r => setTimeout(r, 0));
     assert.equal(saved.textContent, 'Enter a five-digit ZIP code.');
+    assert.equal(saved.hidden, false, 'a visible message must un-hide the element');
   });
 
   it('ZIP save path writes settings and cache using the configured backend URL', async () => {
@@ -234,6 +241,7 @@ describe('options.js settings logic', () => {
 
     assert.equal(setCalled, false);
     assert.equal(saved.textContent, '');
+    assert.equal(saved.hidden, true, 'no message was ever set, so it should stay hidden');
     assert.equal(form.hidden, false, 'a no-op submit should never hide the form');
   });
 
