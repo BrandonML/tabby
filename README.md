@@ -1,5 +1,7 @@
 # Tabby
 
+**[Get Tabby on the Chrome Web Store](https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig)**
+
 Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a nearby, photo-ready adoptable cat. It uses a cache-first UI and a small backend proxy so the RescueGroups public API key never ships in the extension.
 
 ## What is included

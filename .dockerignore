@@ -5,6 +5,7 @@ node_modules
 extension
 test
 test-live
-store-assets
+benchmark
+cws
 tasks
 *.md
