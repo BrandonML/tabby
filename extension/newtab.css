@@ -168,7 +168,19 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .location-actions .secondary:hover { background: transparent; text-decoration: underline; }
 
 form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
-.or-divider { text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0; }
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 8px 0;
+}
+.or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: var(--card-edge); }
 .zip-field { display: flex; gap: 8px; align-items: end; }
 .zip-input-wrap { flex: 1; }
 label { display: block; font-size: 13px; font-weight: 700; }

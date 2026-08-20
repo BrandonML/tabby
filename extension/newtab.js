@@ -73,6 +73,10 @@ function showNotice(message, { linkText = null, linkAction = null, type = "info"
 
   notice.textContent = ""; // Clear existing content safely
   notice.classList.toggle("notice-error", type === "error");
+  // An empty notice still has box-model presence (min-height, flex layout)
+  // even with no text — hide the element itself rather than leaving a
+  // visible blank gap when there's nothing to show.
+  notice.hidden = !message;
   if (!message) return;
 
   if (type === "error") {
