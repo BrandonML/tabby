@@ -8,6 +8,14 @@ const useLocation = document.getElementById("use-location");
 const saved = document.getElementById("saved");
 const closeSettings = document.getElementById("close-settings");
 
+// Same reasoning as newtab.js's showNotice(): #saved reserves visible box
+// space (min-height + flex, via the shared .notice class) even with no
+// text, so hide the element itself rather than leaving a blank gap.
+function setSaved(message) {
+  saved.hidden = !message;
+  saved.textContent = message;
+}
+
 async function refreshCacheForLocation(location, nextSettings) {
   const backendUrl = BACKEND_URL.replace(/\/$/, "");
   const safeSettings = { ...nextSettings };
@@ -22,7 +30,7 @@ async function refreshCacheForLocation(location, nextSettings) {
     if (!response.ok) {
       const message = payload.error || "Unable to refresh nearby cats right now.";
       await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
-      saved.textContent = classifyRefreshError(message);
+      setSaved(classifyRefreshError(message));
       form.hidden = false;
       return;
     }
@@ -30,13 +38,13 @@ async function refreshCacheForLocation(location, nextSettings) {
       settings: safeSettings,
       feedCache: { cards: payload.cards || [], fetchedAt: Date.now(), radiusMiles: payload.radiusMiles || 0, location, page: 1, seenIds: [] }
     });
-    saved.textContent = "Saved.";
+    setSaved("Saved.");
     setTimeout(() => closeSettings.click(), 600);
     return;
   } catch (error) {
     console.error("[tabby]", error);
     await chrome.storage.local.set({ settings: safeSettings, feedCache: null });
-    saved.textContent = "Unable to refresh nearby cats right now.";
+    setSaved("Unable to refresh nearby cats right now.");
     form.hidden = false;
     return;
   }
@@ -65,13 +73,13 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const postalcode = zip.value.trim();
   if (postalcode && !/^\d{5}$/.test(postalcode)) {
-    saved.textContent = "Enter a five-digit ZIP code.";
+    setSaved("Enter a five-digit ZIP code.");
     return;
   }
   if (!postalcode) return;
 
   form.hidden = true;
-  saved.textContent = "Saving…";
+  setSaved("Saving…");
 
   const { settings = {} } = await chrome.storage.local.get(["settings"]);
   const nextSettings = { ...settings, postalcode };
@@ -82,7 +90,7 @@ form.addEventListener("submit", async (event) => {
 
 useLocation.addEventListener("click", async () => {
   form.hidden = true;
-  saved.textContent = "Finding your location…";
+  setSaved("Finding your location…");
   try {
     const coords = await locationFromBrowser();
     const { settings = {} } = await chrome.storage.local.get(["settings"]);
@@ -92,7 +100,7 @@ useLocation.addEventListener("click", async () => {
     await refreshCacheForLocation(coords, nextSettings);
   } catch (error) {
     console.error("[tabby]", error);
-    saved.textContent = "Unable to access your location. Try entering a zip code instead.";
+    setSaved("Unable to access your location. Try entering a zip code instead.");
     form.hidden = false;
   }
 });
