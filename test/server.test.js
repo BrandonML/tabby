@@ -199,6 +199,21 @@ describe("server routing and behavior", () => {
     assert.strictEqual(body.error, "Not found");
   });
 
+  it("GET /healthz returns 200 with status ok", async () => {
+    const { res, data } = await request({ path: '/healthz', method: 'GET' });
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(data);
+    assert.strictEqual(body.status, "ok");
+  });
+
+  it("POST /healthz returns 405 with an Allow header", async () => {
+    const { res, data } = await request({ path: '/healthz', method: 'POST' });
+    assert.strictEqual(res.statusCode, 405);
+    assert.strictEqual(res.headers["allow"], "GET");
+    const body = JSON.parse(data);
+    assert.strictEqual(body.error, "Method Not Allowed");
+  });
+
   it("An oversized body is rejected (413) without hanging", async () => {
     const errorSpy = mock.method(console, 'error', () => {});
     const bigBody = "x".repeat(16385);
