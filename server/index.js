@@ -53,6 +53,10 @@ function safePage(value) {
 
 export const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {});
+  if (request.url === "/healthz") {
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "GET" });
+    return send(response, 200, { status: "ok" });
+  }
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" });
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "POST" });
   try {
