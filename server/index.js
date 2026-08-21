@@ -13,6 +13,51 @@ export const cache = new Map();
 const CACHE_MS = 3 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 
+// Upstream-failure alerting: a 502 here always means something unexpected
+// happened trying to serve a real request (RescueGroups itself failing, a
+// network-level error reaching it, or a genuine bug) — never routine bad
+// user input, which is already mapped to its own 4xx status above. Northflank's
+// own infrastructure alerts don't cover this: the process stays up and
+// /healthz stays green throughout, since neither depends on RescueGroups
+// being reachable (deliberately — coupling liveness to a third-party API
+// would turn their outage into our own restart-loop). A burst of these
+// getting silently swallowed is exactly what went undetected for hours
+// during a real RescueGroups connectivity incident, hence this.
+const ALERT_WINDOW_MS = 10 * 60 * 1000;
+const ALERT_THRESHOLD = 5;
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
+let failureTimestamps = [];
+let lastAlertAt = 0;
+
+// Test-only: reset the module-level alerting state between test runs.
+export function resetAlertStateForTests() {
+  failureTimestamps = [];
+  lastAlertAt = 0;
+}
+
+function recordUpstreamFailureAndMaybeAlert(errorMessage) {
+  // Read live (like RG_API_KEY below), not cached at module load — so it
+  // can be absent in dev/test and configured only in the deployed environment.
+  const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  const now = Date.now();
+  failureTimestamps.push(now);
+  failureTimestamps = failureTimestamps.filter((t) => now - t <= ALERT_WINDOW_MS);
+  if (failureTimestamps.length < ALERT_THRESHOLD || now - lastAlertAt < ALERT_COOLDOWN_MS) return;
+  lastAlertAt = now;
+  const count = failureTimestamps.length;
+  // Fire-and-forget: never let a slow/unreachable webhook delay or fail the
+  // actual user-facing error response.
+  fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: `Tabby backend: ${count} upstream failures in the last ${ALERT_WINDOW_MS / 60000} minutes. Latest error: ${errorMessage}` }),
+    signal: AbortSignal.timeout(5000)
+  }).catch((alertError) => {
+    console.error("[tabby-server] failed to send failure alert", { message: alertError.message });
+  });
+}
+
 function send(response, status, body, extraHeaders = {}) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -93,6 +138,8 @@ export const server = createServer(async (request, response) => {
       url: request.url,
       ...(process.env.NODE_ENV !== "production" ? { stack: error.stack } : {})
     });
+
+    if (status === 502) recordUpstreamFailureAndMaybeAlert(error.message);
 
     return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." });
   }
