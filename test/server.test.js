@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert";
-import { cache, server } from "../server/index.js";
+import { cache, server, resetAlertStateForTests } from "../server/index.js";
 import http from "node:http";
 
 // Need to mock fetch globally to avoid actual RescueGroups hits
@@ -355,5 +355,113 @@ describe("server routing and behavior", () => {
     assert.strictEqual(errorSpy.mock.callCount(), 1);
     const [, logPayload] = errorSpy.mock.calls[0].arguments;
     assert.strictEqual(logPayload.status, 400);
+  });
+});
+
+describe("upstream failure alerting", () => {
+  let port;
+  const webhookUrl = "https://discord.com/api/webhooks/test/token";
+
+  beforeEach(async () => {
+    cache.clear();
+    resetAlertStateForTests();
+    process.env.RG_API_KEY = "test-key";
+    await new Promise((resolve) => server.listen(0, resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    delete process.env.ALERT_WEBHOOK_URL;
+    await new Promise((resolve) => server.close(resolve));
+    mock.restoreAll();
+  });
+
+  const request = (options, body = null) => {
+    return new Promise((resolve, reject) => {
+      const req = http.request({ ...options, hostname: '127.0.0.1', port }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve({ res, data }));
+      });
+      req.on('error', reject);
+      if (body !== null) req.write(body);
+      req.end();
+    });
+  };
+
+  it("does not alert when ALERT_WEBHOOK_URL is unset, even well past the threshold", async () => {
+    let fetchCallCount = 0;
+    mock.method(global, 'fetch', async () => { fetchCallCount++; throw new Error("fetch failed"); });
+    for (let i = 0; i < 8; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: String(20000 + i) } }));
+    }
+    // Exactly one fetch per request (the RescueGroups call) — no extra calls
+    // sneaking in for a webhook alert that should never fire when unset.
+    assert.equal(fetchCallCount, 8, 'no ALERT_WEBHOOK_URL means alerting is a no-op, not an extra fetch call');
+  });
+
+  it("does not alert below the threshold (4 failures)", async () => {
+    process.env.ALERT_WEBHOOK_URL = webhookUrl;
+    let webhookCallCount = 0;
+    mock.method(global, 'fetch', async (url) => {
+      if (typeof url === "string" && url.startsWith(webhookUrl)) { webhookCallCount++; return { ok: true, json: async () => ({}) }; }
+      throw new Error("fetch failed");
+    });
+    for (let i = 0; i < 4; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: String(30000 + i) } }));
+    }
+    assert.equal(webhookCallCount, 0);
+  });
+
+  it("alerts exactly once when 5 failures land within the window", async () => {
+    process.env.ALERT_WEBHOOK_URL = webhookUrl;
+    let webhookCallCount = 0;
+    let lastBody = null;
+    mock.method(global, 'fetch', async (url, opts) => {
+      if (typeof url === "string" && url.startsWith(webhookUrl)) {
+        webhookCallCount++;
+        lastBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({}) };
+      }
+      throw new Error("fetch failed");
+    });
+    for (let i = 0; i < 5; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: String(40000 + i) } }));
+    }
+    assert.equal(webhookCallCount, 1, 'the 5th failure should cross the threshold and fire exactly one alert');
+    assert.ok(lastBody.content.includes("5 upstream failures"));
+    assert.ok(lastBody.content.includes("fetch failed"));
+
+    // A 6th failure right after should NOT re-alert (cooldown).
+    await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: "49999" } }));
+    assert.equal(webhookCallCount, 1, 'the cooldown should suppress a second alert immediately after the first');
+  });
+
+  it("does not count routine 4xx validation errors toward the alert threshold", async () => {
+    process.env.ALERT_WEBHOOK_URL = webhookUrl;
+    let webhookCallCount = 0;
+    mock.method(global, 'fetch', async (url) => {
+      if (typeof url === "string" && url.startsWith(webhookUrl)) { webhookCallCount++; return { ok: true, json: async () => ({}) }; }
+      return { ok: true, json: async () => ({ data: [], included: [] }) };
+    });
+    // Invalid ZIPs never even reach fetch — they fail validation with 400.
+    for (let i = 0; i < 8; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: "12" } }));
+    }
+    assert.equal(webhookCallCount, 0, '4xx validation failures are not upstream failures and must not trigger an alert');
+  });
+
+  it("a webhook call failing does not affect the client-facing response", async () => {
+    process.env.ALERT_WEBHOOK_URL = webhookUrl;
+    mock.method(global, 'fetch', async (url) => {
+      if (typeof url === "string" && url.startsWith(webhookUrl)) throw new Error("webhook unreachable");
+      throw new Error("fetch failed");
+    });
+    let lastRes;
+    for (let i = 0; i < 5; i++) {
+      const { res } = await request({ path: '/api/nearby-cats', method: 'POST' }, JSON.stringify({ location: { postalcode: String(50000 + i) } }));
+      lastRes = res;
+    }
+    assert.strictEqual(lastRes.statusCode, 502, 'the real request still gets its normal error response even if the alert webhook itself fails');
   });
 });
