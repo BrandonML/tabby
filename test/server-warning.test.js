@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 // import() works on Windows too — a raw "C:\..." path throws
 // ERR_UNSUPPORTED_ESM_URL_SCHEME there.
 const serverModuleUrl = new URL("../server/index.js", import.meta.url).href;
-const warningMessage = "WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin before deploying.";
+const warningMessage = "WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin(s), comma-separated if published to multiple stores, before deploying.";
 
 function checkWarning(envOverrides) {
   const env = { ...process.env, ...envOverrides };

@@ -3,10 +3,18 @@ import { fileURLToPath } from "node:url";
 import { findNearbyCats, validateLocation } from "./rescuegroups.js";
 
 const port = Number(process.env.PORT || 8787);
-const allowedOrigin = process.env.ALLOW_ORIGIN || "*";
+// Comma-separated list — one origin per store build (Chrome, Edge, ...),
+// since each store assigns its own extension ID.
+const allowedOrigins = (process.env.ALLOW_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);
 
-if (!process.env.ALLOW_ORIGIN && process.env.NODE_ENV !== "development") {
-  console.warn("WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin before deploying.");
+if (allowedOrigins.length === 0 && process.env.NODE_ENV !== "development") {
+  console.warn("WARNING: ALLOW_ORIGIN is not set — accepting requests from any origin. Set ALLOW_ORIGIN to your extension's chrome-extension://<id> origin(s), comma-separated if published to multiple stores, before deploying.");
+}
+
+function resolveAllowOrigin(requestOrigin) {
+  if (allowedOrigins.length === 0) return "*";
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  return allowedOrigins[0];
 }
 
 export const cache = new Map();
@@ -58,10 +66,11 @@ function recordUpstreamFailureAndMaybeAlert(errorMessage) {
   });
 }
 
-function send(response, status, body, extraHeaders = {}) {
+function send(response, status, body, requestOrigin, extraHeaders = {}) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": resolveAllowOrigin(requestOrigin),
+    "Vary": "Origin",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     ...extraHeaders
@@ -97,13 +106,14 @@ function safePage(value) {
 }
 
 export const server = createServer(async (request, response) => {
-  if (request.method === "OPTIONS") return send(response, 204, {});
+  const origin = request.headers.origin;
+  if (request.method === "OPTIONS") return send(response, 204, {}, origin);
   if (request.url === "/healthz") {
-    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "GET" });
-    return send(response, 200, { status: "ok" });
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
+    return send(response, 200, { status: "ok" }, origin);
   }
-  if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" });
-  if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, { "Allow": "POST" });
+  if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
+  if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });
   try {
     const { location, page } = await bodyOf(request);
     const safeLocation = validateLocation(location);
@@ -114,7 +124,7 @@ export const server = createServer(async (request, response) => {
     if (cached) {
       cache.delete(key);
       cache.set(key, cached);
-      if (Date.now() - cached.createdAt < CACHE_MS) return send(response, 200, { ...cached.value, cached: true });
+      if (Date.now() - cached.createdAt < CACHE_MS) return send(response, 200, { ...cached.value, cached: true }, origin);
     }
 
     const value = await findNearbyCats(safeLocation, { apiKey: process.env.RG_API_KEY, page: requestedPage });
@@ -124,7 +134,7 @@ export const server = createServer(async (request, response) => {
       cache.delete(cache.keys().next().value);
     }
 
-    return send(response, 200, { ...value, cached: false });
+    return send(response, 200, { ...value, cached: false }, origin);
   } catch (error) {
     let status = 502;
     if (error.message === "Payload too large") status = 413;
@@ -141,7 +151,7 @@ export const server = createServer(async (request, response) => {
 
     if (status === 502) recordUpstreamFailureAndMaybeAlert(error.message);
 
-    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." });
+    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." }, origin);
   }
 });
 
