@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the Dockerfile's node:22-alpine so CI runs the same Node
+      # version the server actually deploys on.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      # The live RescueGroups integration test hits the real API and needs a
+      # real key -- it's excluded from CI on purpose (see README "Run the
+      # live RescueGroups integration test..."), same as it's excluded from
+      # `npm test` locally. Run `npm run test:live` manually before merging
+      # any change to search radius, pagination, or the RescueGroups query
+      # contract.

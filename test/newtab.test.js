@@ -6,13 +6,13 @@ import path from 'node:path';
 
 const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.html'), 'utf-8');
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.js'), 'utf-8');
-const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
+const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace(/export function/g, 'function');
 const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
 const locationContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'location.js'), 'utf-8').replace('export async function', 'async function');
 
 function inlineScript(source) {
   return source
-    .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
+    .replace(/import \{ classifyRefreshError, isInvalidZipError \} from "\.\/error-messages\.js";/, errorMsgsContent)
     .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent)
     .replace(/import \{ locationFromBrowser \} from "\.\/location\.js";/, locationContent);
 }
@@ -53,30 +53,57 @@ describe('newtab.js DOM manipulation', () => {
 
   it('showNotice creates safe DOM elements without innerHTML', () => {
     // Call showNotice on the window context
-    window.showNotice("Hello World", { linkText: "Click Me", linkAction: "open-settings" });
+    window.showNotice("Hello World", { links: [{ text: "Click Me", action: "open-settings" }] });
 
     const notice = document.getElementById("notice");
-    assert.equal(notice.childNodes.length, 2);
+    assert.equal(notice.childNodes.length, 1);
+    const body = notice.childNodes[0];
+    assert.equal(body.className, "notice-body");
+    assert.equal(body.childNodes.length, 2);
 
-    const textNode = notice.childNodes[0];
+    const textNode = body.childNodes[0];
     assert.equal(textNode.nodeType, 3); // TEXT_NODE
     assert.equal(textNode.textContent, "Hello World ");
 
-    const button = notice.childNodes[1];
+    const button = body.childNodes[1];
     assert.equal(button.tagName, "BUTTON");
     assert.equal(button.textContent, "Click Me");
     assert.equal(button.className, "notice-link");
     assert.equal(button.dataset.action, "open-settings");
 
     // Attempt an XSS
-    window.showNotice("<img src=x onerror=alert(1)>", { linkText: "<script>alert(2)</script>", linkAction: '">XSS' });
-    assert.equal(notice.childNodes[0].textContent, "<img src=x onerror=alert(1)> ");
-    assert.equal(notice.childNodes[1].textContent, "<script>alert(2)</script>");
-    assert.equal(notice.childNodes[1].dataset.action, '\">XSS');
+    window.showNotice("<img src=x onerror=alert(1)>", { links: [{ text: "<script>alert(2)</script>", action: '">XSS' }] });
+    const body2 = notice.childNodes[0];
+    assert.equal(body2.childNodes[0].textContent, "<img src=x onerror=alert(1)> ");
+    assert.equal(body2.childNodes[1].textContent, "<script>alert(2)</script>");
+    assert.equal(body2.childNodes[1].dataset.action, '\">XSS');
 
     // Ensure no HTML elements were created by accident
     assert.equal(notice.querySelector('img'), null);
     assert.equal(notice.querySelector('script'), null);
+  });
+
+  it('showNotice splices multiple links inline via {token} placeholders', () => {
+    window.showNotice("Try a different {zip} or {explore}.", {
+      links: [
+        { token: "zip", text: "zip code", action: "open-settings" },
+        { token: "explore", text: "explore another city", action: "start-explore" }
+      ],
+      type: "error"
+    });
+
+    const notice = document.getElementById("notice");
+    const body = notice.querySelector('.notice-body');
+    const links = body.querySelectorAll('.notice-link');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].textContent, "zip code");
+    assert.equal(links[0].dataset.action, "open-settings");
+    assert.equal(links[1].textContent, "explore another city");
+    assert.equal(links[1].dataset.action, "start-explore");
+    // The full sentence -- including the surrounding words -- must survive
+    // as one continuous run of text with the links spliced in place, not
+    // just the two link labels floating with the rest of the text dropped.
+    assert.equal(body.textContent, "Try a different zip code or explore another city.");
   });
 
   it('renderCard creates safe DOM elements without innerHTML', () => {
@@ -134,6 +161,140 @@ describe('newtab.js DOM manipulation', () => {
       const h1 = document.querySelector('#card h1');
       assert.ok(h1.classList.contains('name'));
       assert.equal(h1.classList.contains('name-long'), false);
+    });
+  });
+  describe('Share this cat (GitHub issue #27)', () => {
+    const shareCardData = {
+      name: "Luna",
+      breed: "Tabby",
+      age: "Adult",
+      sex: "Female",
+      rescueName: "Happy Paws Rescue",
+      rescueUrl: "https://rescue.org",
+      profileUrl: "https://rescuegroups.org/animals/luna",
+      imageUrl: "https://cdn.rescuegroups.org/pic.jpg"
+    };
+
+    it('does not render a share button when the platform has no Web Share API', () => {
+      delete window.navigator.share;
+      window.renderCard(shareCardData);
+      assert.equal(document.querySelector('#card .share'), null);
+    });
+
+    it('renders a "Share {name}" button when navigator.share is available', () => {
+      window.navigator.share = async () => {};
+      window.renderCard(shareCardData);
+      const shareButton = document.querySelector('#card .share');
+      assert.ok(shareButton);
+      assert.equal(shareButton.textContent, 'Share Luna');
+      assert.equal(shareButton.tagName, 'BUTTON');
+    });
+
+    it('shares the photo, text and profile link together when the platform supports file attachments', async () => {
+      window.navigator.canShare = () => true;
+      let sharedData;
+      window.navigator.share = async (data) => { sharedData = data; };
+      window.fetch = async (url) => {
+        assert.ok(url.includes('/api/photo-share?url='), 'must fetch through the CORS-safe photo-share proxy, not the CDN directly');
+        return { ok: true, blob: async () => new window.Blob(["fake-photo-bytes"], { type: "image/jpeg" }) };
+      };
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(sharedData, 'navigator.share should have been called');
+      assert.equal(sharedData.title, 'Meet Luna');
+      assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
+      assert.ok(sharedData.text.includes('Luna'));
+      assert.ok(sharedData.text.includes('Happy Paws Rescue'));
+      assert.ok(sharedData.text.includes('Meet an adoptable cat every time you open a new tab.'), 'must include the Tabby tagline');
+      assert.ok(sharedData.text.includes('chromewebstore.google.com'), 'must promote the Tabby listing');
+      assert.equal(sharedData.files.length, 1);
+      assert.ok(sharedData.files[0] instanceof window.File);
+      assert.equal(sharedData.files[0].type, 'image/jpeg');
+    });
+
+    it('promotes the Edge Add-ons listing instead of the Chrome Web Store when running in Edge', async () => {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        configurable: true
+      });
+      window.navigator.canShare = () => true;
+      let sharedData;
+      window.navigator.share = async (data) => { sharedData = data; };
+      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(sharedData);
+      assert.ok(sharedData.text.includes('microsoftedge.microsoft.com/addons'), 'Edge users should get the Edge Add-ons link, not the CWS one');
+      assert.ok(!sharedData.text.includes('chromewebstore.google.com'), 'must not also include the Chrome Web Store link');
+    });
+
+    it('shares without a photo file when canShare rejects file attachments', async () => {
+      window.navigator.canShare = () => false;
+      let sharedData;
+      window.navigator.share = async (data) => { sharedData = data; };
+      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(sharedData);
+      assert.equal(sharedData.files, undefined);
+      assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
+    });
+
+    it('shares without a photo file when the photo-share proxy fetch fails', async () => {
+      let sharedData;
+      window.navigator.canShare = () => true;
+      window.navigator.share = async (data) => { sharedData = data; };
+      window.fetch = async () => ({ ok: false });
+      window.console.error = () => {};
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(sharedData, 'a failed photo fetch should not block sharing the link and text');
+      assert.equal(sharedData.files, undefined);
+    });
+
+    it('treats the user cancelling the native share sheet as a no-op, not an error', async () => {
+      window.navigator.canShare = () => true;
+      window.navigator.share = async () => { const err = new Error('cancelled'); err.name = 'AbortError'; throw err; };
+      window.navigator.clipboard = { writeText: async () => { throw new Error('should not be called'); } };
+      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+      const loggedErrors = [];
+      window.console.error = (...args) => { loggedErrors.push(args); };
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(loggedErrors.length, 0, 'a user-cancelled share should not be logged as an error');
+      assert.equal(document.getElementById('notice').textContent, '');
+    });
+
+    it('falls back to copying the details to the clipboard when navigator.share fails for a real reason', async () => {
+      window.navigator.canShare = () => true;
+      window.navigator.share = async () => { throw new Error('share failed'); };
+      let clipboardText;
+      window.navigator.clipboard = { writeText: async (text) => { clipboardText = text; } };
+      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+      window.console.error = () => {};
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(clipboardText.includes('Luna'));
+      assert.ok(clipboardText.includes('https://rescuegroups.org/animals/luna'));
+      assert.ok(document.getElementById('notice').textContent.includes('Copied to clipboard'));
     });
   });
   describe('showNotice error vs. informational tone', () => {
@@ -287,6 +448,116 @@ describe('newtab.js DOM manipulation', () => {
     assert.ok(img.classList.contains('photo-portrait'));
     assert.equal(img.classList.contains('photo-portrait-mild'), false, 'a tall portrait should not also carry the mild class');
   });
+
+  describe('content-aware crop', () => {
+    const WIDTH = 20;
+    const HEIGHT = 40;
+
+    // JSDOM doesn't implement a real 2D canvas context, so getContext() is
+    // stubbed to return a fake one whose getImageData() hands back
+    // synthetic pixel data with a controlled energy profile, instead of
+    // whatever drawImage() would have actually rendered.
+    function stubCanvasWithPixels(pixelFn) {
+      window.HTMLCanvasElement.prototype.getContext = function () {
+        return {
+          drawImage() {},
+          getImageData(x, y, width, height) {
+            const data = new Uint8ClampedArray(width * height * 4);
+            for (let py = 0; py < height; py++) {
+              for (let px = 0; px < width; px++) {
+                const value = pixelFn(px, py);
+                const o = (py * width + px) * 4;
+                data[o] = data[o + 1] = data[o + 2] = value;
+                data[o + 3] = 255;
+              }
+            }
+            return { data, width, height };
+          }
+        };
+      };
+    }
+
+    function loadPortraitImage() {
+      window.renderCard({ name: "Milo", imageUrl: "https://cdn.rescuegroups.org/pic.jpg" });
+      const img = document.querySelector('.photo');
+      Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 700, configurable: true }); // tall portrait
+      img.dispatchEvent(new window.Event('load'));
+      return img;
+    }
+
+    it('anchors to a high-contrast band instead of the default top when the signal is strong', async () => {
+      window.fetch = async () => ({ ok: true, blob: async () => ({}) });
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      // Uniform everywhere except a strong checkerboard band at rows 10-19
+      // (25%-50% of the image height) -- real subject-like local contrast
+      // against a flat background.
+      stubCanvasWithPixels((x, y) => (y >= 10 && y < 20 ? ((x + y) % 2 === 0 ? 0 : 255) : 100));
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.ok(img.style.objectPosition, 'a strong signal should set an explicit object-position');
+      const percent = Number(img.style.objectPosition.split(' ')[1].replace('%', ''));
+      assert.ok(percent > 15 && percent < 60, `expected the anchor near the 25%-50% band, got ${percent}%`);
+    });
+
+    it('leaves the CSS default untouched when the photo has no localized signal (uniform)', async () => {
+      window.fetch = async () => ({ ok: true, blob: async () => ({}) });
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      stubCanvasWithPixels(() => 128); // perfectly flat -- zero edge energy anywhere
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '', 'a flat photo has no basis for overriding the default top anchor');
+    });
+
+    it('leaves the CSS default untouched when the analysis fetch fails', async () => {
+      window.fetch = async () => ({ ok: false });
+      window.createImageBitmap = async () => { throw new Error('should not be called'); };
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '');
+    });
+
+    it('leaves the CSS default untouched when the analysis fetch throws (network error)', async () => {
+      window.fetch = async () => { throw new Error('network down'); };
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '');
+    });
+
+    it('requests the analysis thumbnail through the backend proxy, not RescueGroups directly', async () => {
+      let requestedUrl;
+      window.fetch = async (url) => { requestedUrl = url; return { ok: true, blob: async () => ({}) }; };
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      stubCanvasWithPixels(() => 128);
+
+      loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(requestedUrl, 'http://localhost:8787/api/photo-thumb?url=https%3A%2F%2Fcdn.rescuegroups.org%2Fpic.jpg');
+    });
+
+    it('does not run at all for a landscape or square photo', async () => {
+      let fetchCalled = false;
+      window.fetch = async () => { fetchCalled = true; return { ok: true, blob: async () => ({}) }; };
+
+      window.renderCard({ name: "Milo", imageUrl: "https://cdn.rescuegroups.org/pic.jpg" });
+      const img = document.querySelector('.photo');
+      Object.defineProperty(img, 'naturalWidth', { value: 800, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true });
+      img.dispatchEvent(new window.Event('load'));
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(fetchCalled, false);
+    });
+  });
   it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
     assert.deepEqual(window.getSeenIds(null), []);
     assert.deepEqual(window.getSeenIds(undefined), []);
@@ -436,6 +707,37 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(card.hidden, true);
       assert.ok(notice.textContent.includes('No available cats'));
       assert.ok(notice.classList.contains('notice-error'), "an empty-results notice needs the user to act, so it should read as an error");
+    });
+
+    it('offers both a zip-code and an explore-another-city link on empty results (GitHub issue #29)', async () => {
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [], radiusMiles: 5 })
+      });
+
+      await window.refresh({ postalcode: '12345' });
+      const notice = document.getElementById("notice");
+      const links = notice.querySelectorAll('.notice-link');
+      assert.equal(links.length, 2);
+      assert.equal(links[0].textContent, 'zip code');
+      assert.equal(links[0].dataset.action, 'open-settings');
+      assert.equal(links[1].textContent, 'explore another city');
+      assert.equal(links[1].dataset.action, 'start-explore');
+      // The links must read as part of one flowing sentence, not floating
+      // text disconnected from the surrounding message.
+      assert.equal(notice.querySelector('.notice-body').textContent, 'No available cats were found within 5 miles. Try using a different zip code or explore another city.');
+
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 }) };
+      };
+      links[1].dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(fetchedBody, 'clicking "explore another city" should trigger the same explore fetch as the header Explore button');
+      assert.equal(document.getElementById('card').querySelector('h1').textContent, 'ExploreCat');
+      assert.equal(document.getElementById('explore-banner').hidden, false);
     });
 
     it('resets to page 1 when a later page comes back exhausted and empty', async () => {
@@ -902,7 +1204,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.ok(notice.textContent.includes('Unable to determine your location'));
     });
 
-    it('logs and shows a notice when refresh fails', async () => {
+    it('logs and shows a notice with a report-issue link when refresh fails generically', async () => {
       window.fetch = async () => ({
         ok: false,
         json: async () => ({ error: "Server error" })
@@ -919,6 +1221,31 @@ describe('newtab.js DOM manipulation', () => {
 
       const notice = document.getElementById("notice");
       assert.ok(notice.textContent.length > 0);
+      const link = notice.querySelector('.notice-link');
+      assert.ok(link, 'a report-issue link should be rendered for a non-ZIP failure');
+      assert.equal(link.dataset.action, 'report-issue');
+      assert.equal(link.textContent, 'Report an issue');
+
+      let opened;
+      window.open = (url) => { opened = url; };
+      link.dispatchEvent(new window.Event('click'));
+      assert.equal(opened, 'https://github.com/BrandonML/tabby/issues');
+    });
+
+    it('shows the zip-code settings link (not report-issue) when refresh fails on an invalid ZIP', async () => {
+      window.fetch = async () => ({
+        ok: false,
+        json: async () => ({ error: "Provide a five-digit postal code or valid latitude and longitude." })
+      });
+      window.console.error = () => {};
+
+      await window.start();
+
+      const notice = document.getElementById("notice");
+      const link = notice.querySelector('.notice-link');
+      assert.ok(link);
+      assert.equal(link.dataset.action, 'open-settings');
+      assert.equal(link.textContent, 'zip code');
     });
 
     it('prevents multiple concurrent executions', async () => {

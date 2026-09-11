@@ -2,11 +2,12 @@ import { classifyRefreshError } from "./error-messages.js";
 import { BACKEND_URL } from "./config.js";
 import { locationFromBrowser } from "./location.js";
 
-const form = document.getElementById("settings-form");
-const zip = document.getElementById("zip");
-const useLocation = document.getElementById("use-location");
-const saved = document.getElementById("saved");
-const closeSettings = document.getElementById("close-settings");
+const $ = (id) => document.getElementById(id);
+const form = $("settings-form");
+const zip = $("zip");
+const useLocation = $("use-location");
+const saved = $("saved");
+const closeSettings = $("close-settings");
 
 // Same reasoning as newtab.js's showNotice(): #saved reserves visible box
 // space (min-height + flex, via the shared .notice class) even with no

@@ -1,7 +1,8 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert";
-import { cache, server, resetAlertStateForTests } from "../server/index.js";
+import { cache, server, resetAlertStateForTests, resetRateLimitsForTests } from "../server/index.js";
 import http from "node:http";
+import net from "node:net";
 
 // Need to mock fetch globally to avoid actual RescueGroups hits
 describe("server cache", () => {
@@ -9,6 +10,7 @@ describe("server cache", () => {
 
   beforeEach(async () => {
     cache.clear();
+    resetRateLimitsForTests();
     await new Promise((resolve) => server.listen(0, resolve));
     port = server.address().port;
   });
@@ -64,6 +66,11 @@ describe("server cache", () => {
     async function makeRequestsInBatches(zips) {
       for (let i = 0; i < zips.length; i += BATCH_SIZE) {
         await Promise.all(zips.slice(i, i + BATCH_SIZE).map(makeRequest));
+        // This test is about cache eviction, not rate limiting -- all 500+
+        // requests land from the same loopback IP, which the per-IP rate
+        // limiter would otherwise start rejecting well before this test's
+        // real target (cache-size bounding) is ever reached.
+        resetRateLimitsForTests();
       }
     }
 
@@ -101,6 +108,7 @@ describe("server routing and behavior", () => {
 
   beforeEach(async () => {
     cache.clear();
+    resetRateLimitsForTests();
     await new Promise((resolve) => server.listen(0, resolve));
     port = server.address().port;
   });
@@ -206,6 +214,24 @@ describe("server routing and behavior", () => {
     assert.strictEqual(body.status, "ok");
   });
 
+  it("GET /healthz reports null sha when NF_DEPLOYMENT_SHA is unset, as in local dev", async () => {
+    delete process.env.NF_DEPLOYMENT_SHA;
+    const { data } = await request({ path: '/healthz', method: 'GET' });
+    const body = JSON.parse(data);
+    assert.strictEqual(body.sha, null);
+  });
+
+  it("GET /healthz reports NF_DEPLOYMENT_SHA when Northflank has injected it, so a post-deploy check can confirm the new code is live", async () => {
+    process.env.NF_DEPLOYMENT_SHA = "abc1234";
+    try {
+      const { data } = await request({ path: '/healthz', method: 'GET' });
+      const body = JSON.parse(data);
+      assert.strictEqual(body.sha, "abc1234");
+    } finally {
+      delete process.env.NF_DEPLOYMENT_SHA;
+    }
+  });
+
   it("POST /healthz returns 405 with an Allow header", async () => {
     const { res, data } = await request({ path: '/healthz', method: 'POST' });
     assert.strictEqual(res.statusCode, 405);
@@ -225,6 +251,57 @@ describe("server routing and behavior", () => {
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Payload too large");
     assert.strictEqual(errorSpy.mock.callCount(), 1);
+    // The body was abandoned mid-read, so the connection isn't safe to
+    // reuse for a next request.
+    assert.strictEqual(res.headers.connection, "close");
+  });
+
+  it("A request whose body never finishes arriving times out with a real 408, not a bare connection reset", async () => {
+    const errorSpy = mock.method(console, 'error', () => {});
+    const originalTimeoutMs = process.env.REQUEST_BODY_TIMEOUT_MS;
+    process.env.REQUEST_BODY_TIMEOUT_MS = "50";
+    try {
+      // A raw socket, not the http.request-based `request()` helper above —
+      // that helper always calls req.end(), which completes the body. This
+      // deliberately writes a partial body and never ends it, so the
+      // request genuinely stalls and the server's own timeout has to fire.
+      const { statusCode, headers, body } = await new Promise((resolve, reject) => {
+        const socket = net.connect(port, "127.0.0.1", () => {
+          socket.write(
+            "POST /api/nearby-cats HTTP/1.1\r\n" +
+            "Host: 127.0.0.1\r\n" +
+            "Content-Type: application/json\r\n" +
+            "Content-Length: 100\r\n" +
+            "\r\n" +
+            '{"location":'
+          );
+        });
+        let raw = "";
+        socket.on("data", (chunk) => { raw += chunk.toString(); });
+        socket.on("close", () => {
+          const [statusLine, ...rest] = raw.split("\r\n\r\n")[0].split("\r\n");
+          const statusCode = Number(statusLine.split(" ")[1]);
+          const headers = Object.fromEntries(
+            rest.map((line) => {
+              const [key, ...valueParts] = line.split(":");
+              return [key.toLowerCase(), valueParts.join(":").trim()];
+            })
+          );
+          const chunkedBody = raw.split("\r\n\r\n")[1] || "";
+          const body = chunkedBody.split("\r\n")[1] || ""; // skip the chunk-size line
+          resolve({ statusCode, headers, body });
+        });
+        socket.on("error", reject);
+      });
+
+      assert.strictEqual(statusCode, 408);
+      assert.strictEqual(headers.connection, "close");
+      assert.deepStrictEqual(JSON.parse(body), { error: "Request timeout" });
+      assert.strictEqual(errorSpy.mock.callCount(), 1);
+    } finally {
+      if (originalTimeoutMs === undefined) delete process.env.REQUEST_BODY_TIMEOUT_MS;
+      else process.env.REQUEST_BODY_TIMEOUT_MS = originalTimeoutMs;
+    }
   });
 
   it("Malformed JSON body returns 400, not 502", async () => {
@@ -249,6 +326,48 @@ describe("server routing and behavior", () => {
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Provide a five-digit postal code or valid latitude and longitude.");
     assert.strictEqual(errorSpy.mock.callCount(), 1);
+  });
+
+  it("allows requests under the per-IP limit, then rejects further ones with 429", async () => {
+    mock.method(console, 'error', () => {});
+    // An invalid ZIP is a cheap, fast 400 -- rate limiting is checked before
+    // the body is even parsed, so what the request would otherwise return
+    // doesn't matter here.
+    const badBody = JSON.stringify({ location: { postalcode: "123" } });
+    for (let i = 0; i < 30; i++) {
+      const { res } = await request({ path: '/api/nearby-cats', method: 'POST' }, badBody);
+      assert.strictEqual(res.statusCode, 400, `request ${i + 1} of 30 should not be rate-limited yet`);
+    }
+    const { res, data } = await request({ path: '/api/nearby-cats', method: 'POST' }, badBody);
+    assert.strictEqual(res.statusCode, 429);
+    assert.ok(Number(res.headers['retry-after']) > 0);
+    assert.strictEqual(res.headers.connection, 'close', 'the unread body makes the connection unsafe to reuse');
+    assert.deepStrictEqual(JSON.parse(data), { error: "Too many requests. Please try again later." });
+  });
+
+  it("scopes the rate limit per client IP (via X-Forwarded-For), not globally", async () => {
+    mock.method(console, 'error', () => {});
+    const badBody = JSON.stringify({ location: { postalcode: "123" } });
+    for (let i = 0; i < 30; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST', headers: { 'X-Forwarded-For': '1.2.3.4' } }, badBody);
+    }
+    const limited = await request({ path: '/api/nearby-cats', method: 'POST', headers: { 'X-Forwarded-For': '1.2.3.4' } }, badBody);
+    assert.strictEqual(limited.res.statusCode, 429);
+
+    const otherIp = await request({ path: '/api/nearby-cats', method: 'POST', headers: { 'X-Forwarded-For': '5.6.7.8' } }, badBody);
+    assert.strictEqual(otherIp.res.statusCode, 400, "a different client IP must not be affected by another IP's rate limit");
+  });
+
+  it("does not rate-limit OPTIONS preflight or /healthz once /api/nearby-cats is limited", async () => {
+    mock.method(console, 'error', () => {});
+    const badBody = JSON.stringify({ location: { postalcode: "123" } });
+    for (let i = 0; i < 31; i++) {
+      await request({ path: '/api/nearby-cats', method: 'POST' }, badBody);
+    }
+    const optionsRes = await request({ path: '/api/nearby-cats', method: 'OPTIONS' });
+    assert.strictEqual(optionsRes.res.statusCode, 204);
+    const healthRes = await request({ path: '/healthz', method: 'GET' });
+    assert.strictEqual(healthRes.res.statusCode, 200);
   });
 
   it("Different page numbers for the same location are cached independently", async () => {
@@ -364,6 +483,7 @@ describe("upstream failure alerting", () => {
 
   beforeEach(async () => {
     cache.clear();
+    resetRateLimitsForTests();
     resetAlertStateForTests();
     process.env.RG_API_KEY = "test-key";
     await new Promise((resolve) => server.listen(0, resolve));

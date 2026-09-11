@@ -1,4 +1,4 @@
-import { classifyRefreshError } from "./error-messages.js";
+import { classifyRefreshError, isInvalidZipError } from "./error-messages.js";
 import { BACKEND_URL } from "./config.js";
 import { locationFromBrowser } from "./location.js";
 
@@ -18,8 +18,36 @@ const SEEN_REFRESH_RATIO = 0.85;
 // box, and only the genuinely tall tail gets the full treatment.
 const MILD_PORTRAIT_HEIGHT_RATIO = 1.1;
 const TALL_PORTRAIT_HEIGHT_RATIO = 1.35;
+// How much denser the winning row-band's edge energy has to be than the
+// photo's own average row before it's trusted as a real subject signal
+// rather than noise — see applyContentAwareCrop(). Calibrated against a
+// dozen real portrait photos pulled live from the API (including issue
+// #24's own cited example, a 500x1071 cat-dead-center photo that scored
+// 1.12): every other sampled photo scored 1.19+, so 1.10 catches the hard
+// case with a small margin while still requiring a real, non-trivial
+// signal (a flat/textureless photo scores at or near 1.0).
+const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
+const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
+const PHOTO_SHARE_TIMEOUT_MS = 6000;
+const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
+const TABBY_EDGE_URL = "https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho";
+const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
+
+// Chromium-based Edge identifies itself with "Edg/" in its user agent (not
+// "Edge/", which was the older, pre-Chromium EdgeHTML browser) -- checked
+// ahead of the generic case since Edge's UA also contains "Chrome/". An
+// Edge user sharing a cat should link to the Edge Add-ons listing, since
+// Edge blocks one-click installs from the Chrome Web Store by default.
+function tabbyStoreUrl() {
+  return navigator.userAgent.includes("Edg/") ? TABBY_EDGE_URL : TABBY_CWS_URL;
+}
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
+const ZIP_SETTINGS_LINK = { text: "zip code", action: "open-settings" };
+const NO_RESULTS_LINKS = [
+  { ...ZIP_SETTINGS_LINK, token: "zip" },
+  { text: "explore another city", action: "start-explore", token: "explore" }
+];
 
 // Well-known US metro coordinates, chosen for broad RescueGroups coverage.
 // Not individually spot-checked against the live API — a location with no
@@ -67,7 +95,28 @@ function showExploreBanner(label) {
 function hideExploreBanner() {
   $("explore-banner").hidden = true;
 }
-function showNotice(message, { linkText = null, linkAction = null, type = "info" } = {}) {
+function buildNoticeLinkButton(link) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "notice-link";
+  button.dataset.action = link.action;
+  button.textContent = link.text;
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (link.action === "open-settings") openSettings();
+    else if (link.action === "report-issue") window.open("https://github.com/BrandonML/tabby/issues", "_blank", "noopener,noreferrer");
+    else if (link.action === "start-explore") startExplore();
+  });
+  return button;
+}
+
+// `links` is `[{ text, action, token? }]`. When a link has a `token` and the
+// message contains a matching `{token}`, the button is spliced in at that
+// exact spot (needed for a message with more than one link, e.g. "...try a
+// different {zip} or {explore}."). Otherwise every link is appended after
+// the message in order -- the common single-link case, unchanged from
+// before this supported multiple links.
+function showNotice(message, { links = [], type = "info" } = {}) {
   const notice = $("notice");
   if (!notice) return;
 
@@ -86,25 +135,37 @@ function showNotice(message, { linkText = null, linkAction = null, type = "info"
     notice.appendChild(icon);
   }
 
-  if (linkText && linkAction) {
-    notice.appendChild(document.createTextNode(`${message} `));
+  // The message and any links live in one wrapping element so they flow as
+  // normal text -- a link mid-sentence, wrapping with the words around it --
+  // instead of `.notice`'s flex layout treating each one as its own row item
+  // with a fixed gap, which is what made a trailing link look like a
+  // detached chip rather than part of the sentence (GitHub issue #29).
+  const body = document.createElement("span");
+  body.className = "notice-body";
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "notice-link";
-    button.dataset.action = linkAction;
-    button.textContent = linkText;
-
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (linkAction === "open-settings") openSettings();
+  const hasMatchingToken = links.some((link) => link.token && message.includes(`{${link.token}}`));
+  if (links.length > 0 && hasMatchingToken) {
+    const tokenPattern = /\{(\w+)\}/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tokenPattern.exec(message))) {
+      if (match.index > lastIndex) body.appendChild(document.createTextNode(message.slice(lastIndex, match.index)));
+      const link = links.find((l) => l.token === match[1]);
+      body.appendChild(link ? buildNoticeLinkButton(link) : document.createTextNode(match[0]));
+      lastIndex = tokenPattern.lastIndex;
+    }
+    if (lastIndex < message.length) body.appendChild(document.createTextNode(message.slice(lastIndex)));
+  } else if (links.length > 0) {
+    body.appendChild(document.createTextNode(`${message} `));
+    links.forEach((link, i) => {
+      body.appendChild(buildNoticeLinkButton(link));
+      if (i < links.length - 1) body.appendChild(document.createTextNode(" "));
     });
-
-    notice.appendChild(button);
-    return;
+  } else {
+    body.appendChild(document.createTextNode(message));
   }
 
-  notice.appendChild(document.createTextNode(message));
+  notice.appendChild(body);
 }
 function readingFormat(value) {
   if (!value) return "";
@@ -114,6 +175,93 @@ function readingFormat(value) {
   if (ageInDays < 1) return "Today";
   if (ageInDays < 30) return `${ageInDays} day${ageInDays === 1 ? "" : "s"} ago`;
   return new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }).format(updatedAt);
+}
+
+// Content-aware crop for portrait photos (GitHub issue #24): the fixed
+// object-position: top anchor (see photo-portrait/-mild in newtab.css)
+// assumes the subject is near the top of the frame, which is often true
+// but not always — a centered or lower subject gets cropped out entirely.
+// This computes a per-photo vertical anchor instead, from a row-wise
+// edge/contrast-energy profile (a crude proxy for "where's the subject":
+// fur, faces, and toys carry more local contrast than a plain floor or
+// wall). Requires reading pixel data, which RescueGroups' CDN images can't
+// give us directly — they send no CORS headers, so a canvas drawn from one
+// via <img> is tainted and getImageData() throws unconditionally. Fetching
+// a small analysis-only thumbnail through our own backend (which does send
+// CORS headers) sidesteps that. Any failure — network, decode, a low-
+// confidence profile — leaves the CSS default (object-position: top)
+// untouched, so the worst case is exactly today's behavior.
+async function applyContentAwareCrop(img, imageUrl) {
+  try {
+    const backendUrl = BACKEND_URL.replace(/\/$/, "");
+    const response = await fetch(`${backendUrl}/api/photo-thumb?url=${encodeURIComponent(imageUrl)}`, {
+      signal: AbortSignal.timeout(PORTRAIT_ANALYSIS_TIMEOUT_MS)
+    });
+    if (!response.ok) return;
+
+    const bitmap = await createImageBitmap(await response.blob());
+    const { width, height } = bitmap;
+    if (width < 4 || height < 4) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0);
+    const { data } = ctx.getImageData(0, 0, width, height);
+
+    const gray = new Float32Array(width * height);
+    for (let i = 0; i < gray.length; i++) {
+      const o = i * 4;
+      gray[i] = 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+    }
+
+    // Per-row gradient-magnitude sum — a crude Sobel-style edge/contrast
+    // energy profile. Rows 0 and height-1 are left at 0 (no neighbor on one
+    // side); negligible for a >=4px-tall image.
+    const rowEnergy = new Float64Array(height);
+    for (let y = 1; y < height - 1; y++) {
+      let energy = 0;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        energy += Math.abs(gray[idx + 1] - gray[idx - 1]) + Math.abs(gray[idx + width] - gray[idx - width]);
+      }
+      rowEnergy[y] = energy;
+    }
+
+    // Slide a band roughly a third of the photo's height (a plausible
+    // subject-fill assumption) down the energy profile and keep the
+    // highest-energy position — smooths out single-row noise spikes into a
+    // contiguous "subject band" instead of chasing one pixel-thin peak.
+    const bandHeight = Math.max(1, Math.round(height * 0.35));
+    let bandSum = 0;
+    for (let y = 0; y < bandHeight; y++) bandSum += rowEnergy[y];
+    let bestSum = bandSum;
+    let bestStart = 0;
+    for (let y = 1; y <= height - bandHeight; y++) {
+      bandSum += rowEnergy[y + bandHeight - 1] - rowEnergy[y - 1];
+      if (bandSum > bestSum) {
+        bestSum = bandSum;
+        bestStart = y;
+      }
+    }
+
+    // Confidence check: is the winning band meaningfully denser than the
+    // photo's own average row, or is this just a flat/noisy image with no
+    // real localized signal to act on? Below the threshold, do nothing —
+    // acting on a weak signal risks being *worse* than the current fixed
+    // top anchor, which the "no worse than today" bar doesn't allow.
+    let totalEnergy = 0;
+    for (let y = 0; y < height; y++) totalEnergy += rowEnergy[y];
+    const meanRowEnergy = totalEnergy / height;
+    const bandMeanEnergy = bestSum / bandHeight;
+    if (meanRowEnergy <= 0 || bandMeanEnergy / meanRowEnergy < PORTRAIT_ANALYSIS_MIN_CONFIDENCE) return;
+
+    const centerPercent = Math.min(100, Math.max(0, ((bestStart + bandHeight / 2) / height) * 100));
+    img.style.objectPosition = `50% ${centerPercent.toFixed(1)}%`;
+  } catch {
+    // Network failure, decode failure, timeout — leave the CSS default.
+  }
 }
 
 function getSeenIds(feedCache) {
@@ -167,11 +315,13 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     // subject's face/torso in frame, at the cost of some legs/tail. See the
     // MILD/TALL_PORTRAIT_HEIGHT_RATIO comment above for why this is two
     // graduated tiers rather than one.
+    const isPortrait = img.naturalHeight > img.naturalWidth * MILD_PORTRAIT_HEIGHT_RATIO;
     if (img.naturalHeight > img.naturalWidth * TALL_PORTRAIT_HEIGHT_RATIO) {
       img.classList.add("photo-portrait");
-    } else if (img.naturalHeight > img.naturalWidth * MILD_PORTRAIT_HEIGHT_RATIO) {
+    } else if (isPortrait) {
       img.classList.add("photo-portrait-mild");
     }
+    if (isPortrait) applyContentAwareCrop(img, card.imageUrl);
   });
   cardContainer.appendChild(img);
 
@@ -241,19 +391,95 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   }
   content.appendChild(rescueP);
 
-  if (profileUrl) {
-    const profileA = document.createElement("a");
-    profileA.className = "profile";
-    profileA.href = profileUrl;
-    profileA.target = "_blank";
-    profileA.rel = "noreferrer";
-    profileA.textContent = "View profile";
-    content.appendChild(profileA);
+  const shareUrl = profileUrl || rescueUrl;
+  if (profileUrl || shareUrl) {
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    if (profileUrl) {
+      const profileA = document.createElement("a");
+      profileA.className = "profile";
+      profileA.href = profileUrl;
+      profileA.target = "_blank";
+      profileA.rel = "noreferrer";
+      profileA.textContent = "View profile";
+      actions.appendChild(profileA);
+    }
+
+    if (shareUrl && typeof navigator.share === "function") {
+      const shareButton = document.createElement("button");
+      shareButton.type = "button";
+      shareButton.className = "share";
+      shareButton.textContent = `Share ${card.name}`;
+      shareButton.addEventListener("click", () => shareCard(card, shareUrl));
+      actions.appendChild(shareButton);
+    }
+
+    content.appendChild(actions);
   }
 
   cardContainer.appendChild(content);
 
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
+}
+
+function buildShareText(card) {
+  const meta = [card.breed, card.age, card.sex].filter(Boolean).join(", ");
+  const intro = meta ? `${card.name} (${meta}) is looking for a home at ${card.rescueName}.` : `${card.name} is looking for a home at ${card.rescueName}.`;
+  return `${intro}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
+}
+
+const IMAGE_CONTENT_TYPE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+
+// RescueGroups' CDN has no CORS headers (see applyContentAwareCrop's comment
+// above), so a client-side fetch of the photo itself would be opaque/blocked
+// the same way a canvas read would be -- routing through our own
+// /api/photo-share proxy (CORS-safe, hostname-locked, forced to a
+// share-appropriate size server-side) is what makes a real File object
+// obtainable here at all.
+async function fetchSharePhoto(imageUrl) {
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
+  const response = await fetch(`${backendUrl}/api/photo-share?url=${encodeURIComponent(imageUrl)}`, { signal: AbortSignal.timeout(PHOTO_SHARE_TIMEOUT_MS) });
+  if (!response.ok) throw new Error("Could not fetch photo for sharing.");
+  const blob = await response.blob();
+  const extension = IMAGE_CONTENT_TYPE_EXTENSIONS[blob.type] || "jpg";
+  return new File([blob], `cat.${extension}`, { type: blob.type || "image/jpeg" });
+}
+
+async function copyShareTextFallback(text, url) {
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    showNotice("Copied to clipboard.");
+  } catch (error) {
+    console.error("[tabby]", error);
+    showNotice("Unable to share right now.", { type: "error" });
+  }
+}
+
+// Tries to attach the actual photo (issue #27 calls this the most important
+// part of the share), then degrades in two steps if that's not possible:
+// first to a link-only native share, then -- if navigator.share itself
+// fails or was never available -- to copying the details to the clipboard.
+async function shareCard(card, shareUrl) {
+  const text = buildShareText(card);
+  const shareData = { title: `Meet ${card.name}`, text, url: shareUrl };
+
+  try {
+    const photoFile = await fetchSharePhoto(card.imageUrl);
+    if (navigator.canShare?.({ files: [photoFile] })) {
+      shareData.files = [photoFile];
+    }
+  } catch (error) {
+    console.error("[tabby]", error); // Photo unavailable -- share the link and text without it.
+  }
+
+  try {
+    await navigator.share(shareData);
+  } catch (error) {
+    if (error?.name === "AbortError") return; // The user closed the share sheet -- not a failure.
+    console.error("[tabby]", error);
+    await copyShareTextFallback(text, shareUrl);
+  }
 }
 
 async function resolveLocation(settings, promptForLocation) {
@@ -300,7 +526,8 @@ async function refresh(location, locationLabel) {
   // Only the *seen* cards are dropped on a refresh — whatever the user
   // hasn't looked at yet survives and is topped up with new cards below,
   // rather than being discarded wholesale.
-  const keptUnseenCards = isRepeatLocation ? feedCache.cards.filter((card) => !priorSeenIds.includes(card.id)) : [];
+  const priorSeenIdSet = new Set(priorSeenIds);
+  const keptUnseenCards = isRepeatLocation ? feedCache.cards.filter((card) => !priorSeenIdSet.has(card.id)) : [];
   let page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
   let feed = await fetchCatsPage(location, page);
   let mergedCards = mergeCards(keptUnseenCards, feed.cards || [], priorSeenIds);
@@ -325,7 +552,7 @@ async function refresh(location, locationLabel) {
   if (!mergedCards.length) {
     setCardVisible(false);
     $("location-panel").hidden = true;
-    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different {zip} or {explore}.`, { links: NO_RESULTS_LINKS, type: "error" });
     return;
   }
   // Every card in mergedCards is guaranteed unseen (seen ones were dropped,
@@ -355,13 +582,13 @@ async function _start({ requestLocation = false } = {}) {
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: shouldRefresh, locationLabel });
   } else if (feedCache && !feedCache.cards?.length) {
-    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different {zip} or {explore}.`, { links: NO_RESULTS_LINKS, type: "error" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
   if (!location) {
     $("location-panel").hidden = false;
     if (requestLocation) {
-      showNotice("Unable to determine your location. Try entering a zip code instead.", { linkText: "zip code", linkAction: "open-settings", type: "error" });
+      showNotice("Unable to determine your location. Try entering a {zip} instead.", { links: [{ ...ZIP_SETTINGS_LINK, token: "zip" }], type: "error" });
     }
     return;
   }
@@ -370,7 +597,13 @@ async function _start({ requestLocation = false } = {}) {
     try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
-      showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+      // A ZIP-validation failure already carries enough detail to know it's
+      // a user issue, so it keeps the settings shortcut instead — the
+      // report-issue link is for failures that might actually be our bug.
+      const noticeOptions = isInvalidZipError(error.message)
+        ? { links: [ZIP_SETTINGS_LINK], type: "error" }
+        : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
+      showNotice(finalMessage, noticeOptions);
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }
@@ -421,6 +654,11 @@ async function exploreArea() {
   }
 }
 
+async function startExplore() {
+  showNotice("Exploring a new area…");
+  await exploreArea();
+}
+
 function showAnotherExploreCard() {
   if (!exploreBatch) return;
   const { selected, nextSeenIds } = nextCard(exploreBatch.cards, exploreBatch.seenIds);
@@ -446,10 +684,7 @@ $("use-location").addEventListener("click", async () => {
   await start({ requestLocation: true });
 });
 $("open-settings").addEventListener("click", openSettings);
-$("explore").addEventListener("click", async () => {
-  showNotice("Exploring a new area…");
-  await exploreArea();
-});
+$("explore").addEventListener("click", startExplore);
 $("show-another-explore-cat").addEventListener("click", () => showAnotherExploreCard());
 $("back-to-my-area").addEventListener("click", async () => {
   exploreBatch = null;

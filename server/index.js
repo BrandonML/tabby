@@ -21,6 +21,59 @@ export const cache = new Map();
 const CACHE_MS = 3 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 
+// Per-IP rate limiting on /api/nearby-cats: the response cache above only
+// helps *repeat* requests for the same location/page, so a script varying
+// postal codes or coordinates would otherwise cost a real RescueGroups call
+// per request, unbounded. A simple in-memory fixed-window counter is
+// architecturally consistent with the cache right above it -- both assume
+// the single-persistent-process deployment target documented in the
+// README, not a distributed/serverless one.
+export const rateLimits = new Map();
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const RATE_LIMIT_MAX = 30;
+// Bounds memory the same way MAX_CACHE_SIZE bounds the response cache --
+// independent of whether the IP key is trustworthy (see clientIp() below),
+// so a flood of distinct/spoofed keys can't grow this unboundedly either.
+const MAX_RATE_LIMIT_ENTRIES = 1000;
+
+// Northflank (and most platforms-as-a-reverse-proxy) terminates the real
+// client connection and forwards to this container, so request.socket
+// .remoteAddress would otherwise be the platform's internal proxy address
+// for every request -- collapsing every real visitor into one shared
+// bucket. Falls back to the socket address for local dev/tests, where
+// there's no proxy in front to set the header.
+function clientIp(request) {
+  const forwarded = request.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return request.socket.remoteAddress || "unknown";
+}
+
+// Test-only: reset the module-level rate-limit state between test runs.
+export function resetRateLimitsForTests() {
+  rateLimits.clear();
+}
+
+// Returns null when the request is allowed, or the number of seconds the
+// client should wait before retrying.
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimits.get(ip);
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimits.set(ip, { count: 1, windowStart: now });
+    return null;
+  }
+  entry.count += 1;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return Math.ceil((entry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000);
+  }
+  if (rateLimits.size > MAX_RATE_LIMIT_ENTRIES) {
+    rateLimits.delete(rateLimits.keys().next().value);
+  }
+  return null;
+}
+
 // Upstream-failure alerting: a 502 here always means something unexpected
 // happened trying to serve a real request (RescueGroups itself failing, a
 // network-level error reaching it, or a genuine bug) — never routine bad
@@ -78,22 +131,145 @@ function send(response, status, body, requestOrigin, extraHeaders = {}) {
   response.end(JSON.stringify(body));
 }
 
-async function bodyOf(request) {
-  request.setTimeout(5000, () => request.destroy(new Error("Request timeout")));
-  const chunks = [];
-  let totalLength = 0;
-  try {
-    for await (const chunk of request) {
+// Reads the body via events rather than `for await` so an early bail-out
+// (oversized payload, timeout) never has to call request.destroy() while
+// the body is still incomplete. IncomingMessage#destroy() destroys the
+// underlying *socket* whenever readableEnded/complete is still false at
+// that point — which is exactly the case both here and on a genuine
+// timeout — so calling it there would kill the connection before the
+// caller's error response ever reaches the client (confirmed empirically:
+// the client saw a bare connection reset, not the intended 408/413 body).
+// Listening for events and simply stopping avoids touching the socket at
+// all; the caller is responsible for closing the connection afterward via
+// a "Connection: close" response header instead.
+function readRequestBody(request, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let totalLength = 0;
+    function cleanup() {
+      request.off("data", onData);
+      request.off("end", onEnd);
+      request.off("error", onError);
+    }
+    function onData(chunk) {
       totalLength += chunk.length;
-      if (totalLength > 16384) throw new Error("Payload too large");
+      if (totalLength > maxBytes) {
+        cleanup();
+        reject(new Error("Payload too large"));
+        return;
+      }
       chunks.push(chunk);
     }
-  } finally {
-    if (request.socket) {
-      request.setTimeout(0);
+    function onEnd() {
+      cleanup();
+      resolve(Buffer.concat(chunks));
     }
+    function onError(error) {
+      cleanup();
+      reject(error);
+    }
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("error", onError);
+  });
+}
+
+async function bodyOf(request) {
+  // Read live rather than cached at module load (same reasoning as
+  // ALERT_WEBHOOK_URL below) so tests can exercise this path with a short
+  // timeout instead of waiting out the real 5s default.
+  const timeoutMs = Number(process.env.REQUEST_BODY_TIMEOUT_MS) || 5000;
+  const bodyPromise = readRequestBody(request, 16384);
+  let timer;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Request timeout")), timeoutMs);
+    });
+    const raw = await Promise.race([bodyPromise, timeoutPromise]);
+    return JSON.parse(raw.toString("utf8") || "{}");
+  } finally {
+    clearTimeout(timer);
+    // If the timeout won the race, the body-reading listeners are still
+    // attached and will settle later (or never) — swallow that so it can't
+    // surface as an unhandled rejection.
+    bodyPromise.catch(() => {});
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+}
+
+// Content-aware portrait crop (GitHub issue #24): the extension wants to
+// read pixel data from a photo to find where the subject actually is, but
+// RescueGroups' CDN sends no CORS headers on its images, so a client-side
+// canvas drawn from one directly is tainted -- getImageData() throws,
+// unconditionally, no workaround. Proxying a small analysis-only thumbnail
+// through our own origin (which *does* send CORS headers) is the only way
+// to make the pixels readable at all. Hostname-locked to RescueGroups' own
+// CDN and forced to a small width regardless of what the caller asks for,
+// so this can't become a general-purpose open proxy.
+const PHOTO_THUMB_ALLOWED_HOST = "cdn.rescuegroups.org";
+const PHOTO_THUMB_WIDTH = 100;
+const PHOTO_THUMB_MAX_BYTES = 200 * 1024; // generous for a ~100px-wide jpeg
+// A shared photo (GitHub issue #27) is actually looked at, unlike the
+// analysis-only thumbnail above -- 100px would render as a blurry postage
+// stamp in a share sheet. 640px matches a typical social-preview image size;
+// the byte cap is scaled up to match a jpeg at that size with headroom.
+const PHOTO_SHARE_WIDTH = 640;
+const PHOTO_SHARE_MAX_BYTES = 700 * 1024;
+
+function buildPhotoProxyUrl(rawUrl, width) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl));
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== PHOTO_THUMB_ALLOWED_HOST) return null;
+  // Discard any caller-supplied query (including a caller-supplied width)
+  // before enforcing our own -- the whole point is that this can only ever
+  // request a fixed, known-safe image size, never whatever the caller asks
+  // for, so this can't become a general-purpose open proxy.
+  parsed.search = "";
+  parsed.searchParams.set("width", String(width));
+  return parsed.toString();
+}
+
+export function buildPhotoThumbUrl(rawUrl) {
+  return buildPhotoProxyUrl(rawUrl, PHOTO_THUMB_WIDTH);
+}
+
+export function buildPhotoShareUrl(rawUrl) {
+  return buildPhotoProxyUrl(rawUrl, PHOTO_SHARE_WIDTH);
+}
+
+async function sendPhotoProxy(response, requestOrigin, rawUrl, buildUrl, maxBytes) {
+  const upstreamUrl = buildUrl(rawUrl);
+  if (!upstreamUrl) return send(response, 400, { error: "Invalid photo URL." }, requestOrigin);
+
+  try {
+    const upstreamResponse = await fetch(upstreamUrl, { signal: AbortSignal.timeout(5000) });
+    if (!upstreamResponse.ok) return send(response, 502, { error: "Unable to fetch photo." }, requestOrigin);
+
+    const contentType = upstreamResponse.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) return send(response, 502, { error: "Unexpected upstream content." }, requestOrigin);
+
+    // RescueGroups' CDN is hostname-locked and trusted elsewhere in this
+    // file the same way -- buffering fully before the size check (rather
+    // than streaming with a running byte-counter) matches that existing
+    // trust level instead of adding a second, inconsistent defense here.
+    const buffer = Buffer.from(await upstreamResponse.arrayBuffer());
+    if (buffer.length > maxBytes) return send(response, 502, { error: "Photo too large." }, requestOrigin);
+
+    response.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": buffer.length,
+      "Cache-Control": "public, max-age=86400",
+      "Access-Control-Allow-Origin": resolveAllowOrigin(requestOrigin),
+      "Vary": "Origin"
+    });
+    response.end(buffer);
+  } catch (error) {
+    console.error("[tabby-server] photo proxy failed", { message: error.message });
+    return send(response, 502, { error: "Unable to fetch photo." }, requestOrigin);
+  }
 }
 
 function cacheKey(location, page) {
@@ -110,10 +286,33 @@ export const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {}, origin);
   if (request.url === "/healthz") {
     if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
-    return send(response, 200, { status: "ok" }, origin);
+    // NF_DEPLOYMENT_SHA is auto-injected by Northflank at runtime (the git
+    // commit hash of the running build) -- exposing it here lets automated
+    // post-deploy checks confirm the *new* code is actually live, rather
+    // than just that some process is answering on the port. null locally,
+    // where the env var is never set.
+    return send(response, 200, { status: "ok", sha: process.env.NF_DEPLOYMENT_SHA || null }, origin);
+  }
+  if (request.url.startsWith("/api/photo-thumb")) {
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
+    const requestUrl = new URL(request.url, "http://internal");
+    return sendPhotoProxy(response, origin, requestUrl.searchParams.get("url") || "", buildPhotoThumbUrl, PHOTO_THUMB_MAX_BYTES);
+  }
+  if (request.url.startsWith("/api/photo-share")) {
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
+    const requestUrl = new URL(request.url, "http://internal");
+    return sendPhotoProxy(response, origin, requestUrl.searchParams.get("url") || "", buildPhotoShareUrl, PHOTO_SHARE_MAX_BYTES);
   }
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });
+
+  const retryAfterSeconds = checkRateLimit(clientIp(request));
+  if (retryAfterSeconds !== null) {
+    // The body is never read on this path, so (as with the 408/413 cases
+    // below) the connection can't safely be reused for a next request.
+    return send(response, 429, { error: "Too many requests. Please try again later." }, origin, { "Retry-After": String(retryAfterSeconds), "Connection": "close" });
+  }
+
   try {
     const { location, page } = await bodyOf(request);
     const safeLocation = validateLocation(location);
@@ -151,7 +350,15 @@ export const server = createServer(async (request, response) => {
 
     if (status === 502) recordUpstreamFailureAndMaybeAlert(error.message);
 
-    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." }, origin);
+    // A 408 or 413 means the body was abandoned mid-read (timed out, or cut
+    // off past the size cap) — bytes the client already sent (or is still
+    // sending) are never fully consumed, so the connection can't safely be
+    // reused for a next request on the same socket. "Connection: close"
+    // tells Node to close it once this response finishes, instead of
+    // leaving it keep-alive.
+    const extraHeaders = status === 408 || status === 413 ? { "Connection": "close" } : {};
+
+    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." }, origin, extraHeaders);
   }
 });
 

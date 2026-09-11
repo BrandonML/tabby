@@ -1,0 +1,84 @@
+name: Verify production deploy
+
+# Northflank's own build trigger on the `tabby` service fires independently
+# on push to main (see buildConfiguration.pathIgnoreRules there) -- this
+# workflow doesn't control or trigger that build, it just confirms it
+# actually landed. Runs in parallel with Northflank's build, so it has to
+# wait/poll rather than assume the deploy is already done by the time this
+# job starts.
+on:
+  push:
+    branches: [main]
+
+env:
+  PROD_URL: https://p01--tabby--bklqdgzwx4md.code.run
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check whether this push touches a deployed path
+        id: changed
+        run: |
+          # Mirrors the tabby service's own buildConfiguration allow-list
+          # (isAllowList: true, pathIgnoreRules: ["server/**", "Dockerfile"])
+          # -- if Northflank wouldn't rebuild for this push, waiting for the
+          # live sha to change would just time out for no reason.
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -qE '^(server/|Dockerfile$)'; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "No server/** or Dockerfile changes in this push -- Northflank will not rebuild, skipping verification."
+          fi
+
+      - name: Wait for the live deployment to report this commit
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          set -e
+          EXPECTED="${{ github.sha }}"
+          echo "Waiting for $PROD_URL/healthz to report sha=$EXPECTED ..."
+          for i in $(seq 1 40); do
+            ACTUAL=$(curl -fsS "$PROD_URL/healthz" 2>/dev/null | jq -r '.sha // empty' || echo "")
+            if [ "$ACTUAL" = "$EXPECTED" ]; then
+              echo "Live deployment matches ($ACTUAL) after $((i * 15))s."
+              exit 0
+            fi
+            echo "  [$i/40] still on $ACTUAL, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::Timed out after 10 minutes waiting for $PROD_URL to report sha=$EXPECTED (last seen: $ACTUAL). Check the tabby service's build/deploy status on Northflank before proceeding to store submission."
+          exit 1
+
+      - name: Smoke test the live API
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          set -e
+
+          echo "-- /healthz --"
+          curl -fsS "$PROD_URL/healthz" | jq .
+
+          echo "-- POST /api/nearby-cats --"
+          NEARBY=$(curl -fsS -X POST "$PROD_URL/api/nearby-cats" \
+            -H "Content-Type: application/json" \
+            -d '{"location":{"postalcode":"10001"},"page":1}')
+          echo "$NEARBY" | jq '{cardCount: (.cards | length), radiusMiles}'
+          CARD_COUNT=$(echo "$NEARBY" | jq '.cards | length')
+          if [ "$CARD_COUNT" -lt 1 ]; then
+            echo "::error::/api/nearby-cats returned zero cards for a known-good ZIP -- possible RescueGroups outage or regression, not necessarily a bad deploy."
+            exit 1
+          fi
+          IMAGE_URL=$(echo "$NEARBY" | jq -r '.cards[0].imageUrl')
+
+          echo "-- GET /api/photo-thumb --"
+          curl -fsS -o /dev/null -w "status=%{http_code} size=%{size_download}\n" \
+            "$PROD_URL/api/photo-thumb?url=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$IMAGE_URL")"
+
+          echo "-- GET /api/photo-share --"
+          curl -fsS -o /dev/null -w "status=%{http_code} size=%{size_download}\n" \
+            "$PROD_URL/api/photo-share?url=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$IMAGE_URL")"
+
+          echo "All smoke checks passed -- safe to proceed with store submission."
