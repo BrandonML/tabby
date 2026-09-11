@@ -14,7 +14,7 @@ function buildCrcTable() {
 
 const CRC_TABLE = buildCrcTable();
 
-function crc32(buffer) {
+export function crc32(buffer) {
   let crc = 0xffffffff;
   for (let i = 0; i < buffer.length; i++) {
     crc = CRC_TABLE[(crc ^ buffer[i]) & 0xff] ^ (crc >>> 8);
@@ -22,7 +22,7 @@ function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function dosDateTime(date) {
+export function dosDateTime(date) {
   const dosTime =
     ((date.getHours() & 0x1f) << 11) |
     ((date.getMinutes() & 0x3f) << 5) |
