@@ -6,13 +6,13 @@ import path from 'node:path';
 
 const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.html'), 'utf-8');
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'newtab.js'), 'utf-8');
-const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
+const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace(/export function/g, 'function');
 const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
 const locationContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'location.js'), 'utf-8').replace('export async function', 'async function');
 
 function inlineScript(source) {
   return source
-    .replace(/import \{ classifyRefreshError \} from "\.\/error-messages\.js";/, errorMsgsContent)
+    .replace(/import \{ classifyRefreshError, isInvalidZipError \} from "\.\/error-messages\.js";/, errorMsgsContent)
     .replace(/import \{ BACKEND_URL \} from "\.\/config\.js";/, configContent)
     .replace(/import \{ locationFromBrowser \} from "\.\/location\.js";/, locationContent);
 }
@@ -902,7 +902,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.ok(notice.textContent.includes('Unable to determine your location'));
     });
 
-    it('logs and shows a notice when refresh fails', async () => {
+    it('logs and shows a notice with a report-issue link when refresh fails generically', async () => {
       window.fetch = async () => ({
         ok: false,
         json: async () => ({ error: "Server error" })
@@ -919,6 +919,31 @@ describe('newtab.js DOM manipulation', () => {
 
       const notice = document.getElementById("notice");
       assert.ok(notice.textContent.length > 0);
+      const link = notice.querySelector('.notice-link');
+      assert.ok(link, 'a report-issue link should be rendered for a non-ZIP failure');
+      assert.equal(link.dataset.action, 'report-issue');
+      assert.equal(link.textContent, 'Report an issue');
+
+      let opened;
+      window.open = (url) => { opened = url; };
+      link.dispatchEvent(new window.Event('click'));
+      assert.equal(opened, 'https://github.com/BrandonML/tabby/issues');
+    });
+
+    it('shows the zip-code settings link (not report-issue) when refresh fails on an invalid ZIP', async () => {
+      window.fetch = async () => ({
+        ok: false,
+        json: async () => ({ error: "Provide a five-digit postal code or valid latitude and longitude." })
+      });
+      window.console.error = () => {};
+
+      await window.start();
+
+      const notice = document.getElementById("notice");
+      const link = notice.querySelector('.notice-link');
+      assert.ok(link);
+      assert.equal(link.dataset.action, 'open-settings');
+      assert.equal(link.textContent, 'zip code');
     });
 
     it('prevents multiple concurrent executions', async () => {
