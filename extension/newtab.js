@@ -1,4 +1,4 @@
-import { classifyRefreshError } from "./error-messages.js";
+import { classifyRefreshError, isInvalidZipError } from "./error-messages.js";
 import { BACKEND_URL } from "./config.js";
 import { locationFromBrowser } from "./location.js";
 
@@ -98,6 +98,7 @@ function showNotice(message, { linkText = null, linkAction = null, type = "info"
     button.addEventListener("click", (event) => {
       event.preventDefault();
       if (linkAction === "open-settings") openSettings();
+      else if (linkAction === "report-issue") window.open("https://github.com/BrandonML/tabby/issues", "_blank", "noopener,noreferrer");
     });
 
     notice.appendChild(button);
@@ -371,7 +372,13 @@ async function _start({ requestLocation = false } = {}) {
     try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
       const finalMessage = classifyRefreshError(error.message);
-      showNotice(finalMessage, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+      // A ZIP-validation failure already carries enough detail to know it's
+      // a user issue, so it keeps the settings shortcut instead — the
+      // report-issue link is for failures that might actually be our bug.
+      const noticeOptions = isInvalidZipError(error.message)
+        ? { linkText: "zip code", linkAction: "open-settings", type: "error" }
+        : { linkText: "Report an issue", linkAction: "report-issue", type: "error" };
+      showNotice(finalMessage, noticeOptions);
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }

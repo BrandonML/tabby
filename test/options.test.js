@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const htmlContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'options.html'), 'utf-8');
 const jsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'options.js'), 'utf-8');
-const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace('export function', 'function');
+const errorMsgsContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'error-messages.js'), 'utf-8').replace(/export function/g, 'function');
 const configContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'config.js'), 'utf-8').replace('export const', 'const');
 const locationContent = fs.readFileSync(path.join(process.cwd(), 'extension', 'location.js'), 'utf-8').replace('export async function', 'async function');
 
