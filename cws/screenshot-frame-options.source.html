@@ -1,0 +1,58 @@
+<!doctype html>
+<!--
+  Companion to screenshot-frame.source.html for the Settings screenshot --
+  see that file's header comment for the full rationale. This one wraps
+  options.html's markup instead of newtab.html's, since it's a separate
+  page with its own script (options.js) rather than a "scene" of newtab.js.
+
+  Capture instructions: same as screenshot-frame.source.html -- serve the
+  repo root at http://localhost:4173, then open
+  http://localhost:4173/cws/screenshot-frame-options.source.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tabby screenshot frame (settings)</title>
+<link rel="stylesheet" href="http://localhost:4173/extension/newtab.css">
+<style>
+  html, body { width: 1280px; height: 800px; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  .stage { transform: scale(1.85); }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <main class="shell">
+      <header>
+        <p class="eyebrow">TABBY SETTINGS</p>
+        <button id="close-settings" class="quiet" type="button" aria-label="Close settings">Close</button>
+      </header>
+      <section class="location-panel">
+        <h1>Your Location</h1>
+        <form id="settings-form">
+          <div class="location-actions">
+            <button id="use-location" class="primary" type="button">Use my location</button>
+          </div>
+          <p class="or-divider">or</p>
+          <div class="zip-field">
+            <div class="zip-input-wrap">
+              <label for="zip">Zip Code <span class="label-optional">(optional)</span></label>
+              <input id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="90210">
+            </div>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+        <p id="saved" class="notice" role="status" hidden></p>
+      </section>
+    </main>
+  </div>
+<script>
+  window.chrome = {
+    storage: { local: { get: async () => ({ settings: { postalcode: '90210' } }), set: async () => {} } },
+    runtime: { getURL: (path) => path },
+    tabs: { query: (_q, cb) => cb([{ id: 1 }]) }
+  };
+</script>
+<script type="module" src="http://localhost:4173/extension/options.js"></script>
+</body>
+</html>
