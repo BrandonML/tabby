@@ -300,7 +300,8 @@ async function refresh(location, locationLabel) {
   // Only the *seen* cards are dropped on a refresh — whatever the user
   // hasn't looked at yet survives and is topped up with new cards below,
   // rather than being discarded wholesale.
-  const keptUnseenCards = isRepeatLocation ? feedCache.cards.filter((card) => !priorSeenIds.includes(card.id)) : [];
+  const priorSeenIdSet = new Set(priorSeenIds);
+  const keptUnseenCards = isRepeatLocation ? feedCache.cards.filter((card) => !priorSeenIdSet.has(card.id)) : [];
   let page = isRepeatLocation ? (feedCache.page || 1) + 1 : 1;
   let feed = await fetchCatsPage(location, page);
   let mergedCards = mergeCards(keptUnseenCards, feed.cards || [], priorSeenIds);
