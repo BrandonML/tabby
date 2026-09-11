@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert";
 import { cache, server, resetAlertStateForTests } from "../server/index.js";
 import http from "node:http";
+import net from "node:net";
 
 // Need to mock fetch globally to avoid actual RescueGroups hits
 describe("server cache", () => {
@@ -225,6 +226,57 @@ describe("server routing and behavior", () => {
     const body = JSON.parse(data);
     assert.strictEqual(body.error, "Payload too large");
     assert.strictEqual(errorSpy.mock.callCount(), 1);
+    // The body was abandoned mid-read, so the connection isn't safe to
+    // reuse for a next request.
+    assert.strictEqual(res.headers.connection, "close");
+  });
+
+  it("A request whose body never finishes arriving times out with a real 408, not a bare connection reset", async () => {
+    const errorSpy = mock.method(console, 'error', () => {});
+    const originalTimeoutMs = process.env.REQUEST_BODY_TIMEOUT_MS;
+    process.env.REQUEST_BODY_TIMEOUT_MS = "50";
+    try {
+      // A raw socket, not the http.request-based `request()` helper above —
+      // that helper always calls req.end(), which completes the body. This
+      // deliberately writes a partial body and never ends it, so the
+      // request genuinely stalls and the server's own timeout has to fire.
+      const { statusCode, headers, body } = await new Promise((resolve, reject) => {
+        const socket = net.connect(port, "127.0.0.1", () => {
+          socket.write(
+            "POST /api/nearby-cats HTTP/1.1\r\n" +
+            "Host: 127.0.0.1\r\n" +
+            "Content-Type: application/json\r\n" +
+            "Content-Length: 100\r\n" +
+            "\r\n" +
+            '{"location":'
+          );
+        });
+        let raw = "";
+        socket.on("data", (chunk) => { raw += chunk.toString(); });
+        socket.on("close", () => {
+          const [statusLine, ...rest] = raw.split("\r\n\r\n")[0].split("\r\n");
+          const statusCode = Number(statusLine.split(" ")[1]);
+          const headers = Object.fromEntries(
+            rest.map((line) => {
+              const [key, ...valueParts] = line.split(":");
+              return [key.toLowerCase(), valueParts.join(":").trim()];
+            })
+          );
+          const chunkedBody = raw.split("\r\n\r\n")[1] || "";
+          const body = chunkedBody.split("\r\n")[1] || ""; // skip the chunk-size line
+          resolve({ statusCode, headers, body });
+        });
+        socket.on("error", reject);
+      });
+
+      assert.strictEqual(statusCode, 408);
+      assert.strictEqual(headers.connection, "close");
+      assert.deepStrictEqual(JSON.parse(body), { error: "Request timeout" });
+      assert.strictEqual(errorSpy.mock.callCount(), 1);
+    } finally {
+      if (originalTimeoutMs === undefined) delete process.env.REQUEST_BODY_TIMEOUT_MS;
+      else process.env.REQUEST_BODY_TIMEOUT_MS = originalTimeoutMs;
+    }
   });
 
   it("Malformed JSON body returns 400, not 502", async () => {

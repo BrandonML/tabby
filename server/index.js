@@ -78,22 +78,69 @@ function send(response, status, body, requestOrigin, extraHeaders = {}) {
   response.end(JSON.stringify(body));
 }
 
-async function bodyOf(request) {
-  request.setTimeout(5000, () => request.destroy(new Error("Request timeout")));
-  const chunks = [];
-  let totalLength = 0;
-  try {
-    for await (const chunk of request) {
+// Reads the body via events rather than `for await` so an early bail-out
+// (oversized payload, timeout) never has to call request.destroy() while
+// the body is still incomplete. IncomingMessage#destroy() destroys the
+// underlying *socket* whenever readableEnded/complete is still false at
+// that point — which is exactly the case both here and on a genuine
+// timeout — so calling it there would kill the connection before the
+// caller's error response ever reaches the client (confirmed empirically:
+// the client saw a bare connection reset, not the intended 408/413 body).
+// Listening for events and simply stopping avoids touching the socket at
+// all; the caller is responsible for closing the connection afterward via
+// a "Connection: close" response header instead.
+function readRequestBody(request, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let totalLength = 0;
+    function cleanup() {
+      request.off("data", onData);
+      request.off("end", onEnd);
+      request.off("error", onError);
+    }
+    function onData(chunk) {
       totalLength += chunk.length;
-      if (totalLength > 16384) throw new Error("Payload too large");
+      if (totalLength > maxBytes) {
+        cleanup();
+        reject(new Error("Payload too large"));
+        return;
+      }
       chunks.push(chunk);
     }
-  } finally {
-    if (request.socket) {
-      request.setTimeout(0);
+    function onEnd() {
+      cleanup();
+      resolve(Buffer.concat(chunks));
     }
+    function onError(error) {
+      cleanup();
+      reject(error);
+    }
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("error", onError);
+  });
+}
+
+async function bodyOf(request) {
+  // Read live rather than cached at module load (same reasoning as
+  // ALERT_WEBHOOK_URL below) so tests can exercise this path with a short
+  // timeout instead of waiting out the real 5s default.
+  const timeoutMs = Number(process.env.REQUEST_BODY_TIMEOUT_MS) || 5000;
+  const bodyPromise = readRequestBody(request, 16384);
+  let timer;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Request timeout")), timeoutMs);
+    });
+    const raw = await Promise.race([bodyPromise, timeoutPromise]);
+    return JSON.parse(raw.toString("utf8") || "{}");
+  } finally {
+    clearTimeout(timer);
+    // If the timeout won the race, the body-reading listeners are still
+    // attached and will settle later (or never) — swallow that so it can't
+    // surface as an unhandled rejection.
+    bodyPromise.catch(() => {});
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
 function cacheKey(location, page) {
@@ -151,7 +198,15 @@ export const server = createServer(async (request, response) => {
 
     if (status === 502) recordUpstreamFailureAndMaybeAlert(error.message);
 
-    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." }, origin);
+    // A 408 or 413 means the body was abandoned mid-read (timed out, or cut
+    // off past the size cap) — bytes the client already sent (or is still
+    // sending) are never fully consumed, so the connection can't safely be
+    // reused for a next request on the same socket. "Connection: close"
+    // tells Node to close it once this response finishes, instead of
+    // leaving it keep-alive.
+    const extraHeaders = status === 408 || status === 413 ? { "Connection": "close" } : {};
+
+    return send(response, status, { error: status < 500 ? error.message : "Unable to refresh nearby cats right now." }, origin, extraHeaders);
   }
 });
 
