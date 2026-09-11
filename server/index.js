@@ -286,7 +286,12 @@ export const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {}, origin);
   if (request.url === "/healthz") {
     if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
-    return send(response, 200, { status: "ok" }, origin);
+    // NF_DEPLOYMENT_SHA is auto-injected by Northflank at runtime (the git
+    // commit hash of the running build) -- exposing it here lets automated
+    // post-deploy checks confirm the *new* code is actually live, rather
+    // than just that some process is answering on the port. null locally,
+    // where the env var is never set.
+    return send(response, 200, { status: "ok", sha: process.env.NF_DEPLOYMENT_SHA || null }, origin);
   }
   if (request.url.startsWith("/api/photo-thumb")) {
     if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });

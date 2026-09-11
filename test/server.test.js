@@ -214,6 +214,24 @@ describe("server routing and behavior", () => {
     assert.strictEqual(body.status, "ok");
   });
 
+  it("GET /healthz reports null sha when NF_DEPLOYMENT_SHA is unset, as in local dev", async () => {
+    delete process.env.NF_DEPLOYMENT_SHA;
+    const { data } = await request({ path: '/healthz', method: 'GET' });
+    const body = JSON.parse(data);
+    assert.strictEqual(body.sha, null);
+  });
+
+  it("GET /healthz reports NF_DEPLOYMENT_SHA when Northflank has injected it, so a post-deploy check can confirm the new code is live", async () => {
+    process.env.NF_DEPLOYMENT_SHA = "abc1234";
+    try {
+      const { data } = await request({ path: '/healthz', method: 'GET' });
+      const body = JSON.parse(data);
+      assert.strictEqual(body.sha, "abc1234");
+    } finally {
+      delete process.env.NF_DEPLOYMENT_SHA;
+    }
+  });
+
   it("POST /healthz returns 405 with an Allow header", async () => {
     const { res, data } = await request({ path: '/healthz', method: 'POST' });
     assert.strictEqual(res.statusCode, 405);

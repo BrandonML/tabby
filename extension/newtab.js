@@ -30,7 +30,21 @@ const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 const PHOTO_SHARE_TIMEOUT_MS = 6000;
 const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
+// TODO: replace with the real Edge Add-ons listing URL once it's live and
+// public (the store id 0RDCK9VTFG8C does not yet resolve to a working
+// listing as of this writing -- still in review). Falls back to the Chrome
+// Web Store link rather than a broken/placeholder URL in the meantime.
+const TABBY_EDGE_URL = TABBY_CWS_URL;
 const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
+
+// Chromium-based Edge identifies itself with "Edg/" in its user agent (not
+// "Edge/", which was the older, pre-Chromium EdgeHTML browser) -- checked
+// ahead of the generic case since Edge's UA also contains "Chrome/". An
+// Edge user sharing a cat should link to the Edge Add-ons listing, since
+// Edge blocks one-click installs from the Chrome Web Store by default.
+function tabbyStoreUrl() {
+  return navigator.userAgent.includes("Edg/") ? TABBY_EDGE_URL : TABBY_CWS_URL;
+}
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 const ZIP_SETTINGS_LINK = { text: "zip code", action: "open-settings" };
@@ -416,7 +430,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
 function buildShareText(card) {
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(", ");
   const intro = meta ? `${card.name} (${meta}) is looking for a home at ${card.rescueName}.` : `${card.name} is looking for a home at ${card.rescueName}.`;
-  return `${intro}\n\n${TABBY_TAGLINE} Get Tabby: ${TABBY_CWS_URL}`;
+  return `${intro}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
 }
 
 const IMAGE_CONTENT_TYPE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };

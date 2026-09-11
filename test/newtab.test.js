@@ -215,6 +215,27 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(sharedData.files[0].type, 'image/jpeg');
     });
 
+    it('promotes the Edge Add-ons listing instead of the Chrome Web Store when running in Edge', async () => {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        configurable: true
+      });
+      window.navigator.canShare = () => true;
+      let sharedData;
+      window.navigator.share = async (data) => { sharedData = data; };
+      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+
+      window.renderCard(shareCardData);
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(sharedData);
+      // TODO: once TABBY_EDGE_URL points at the real Edge Add-ons listing
+      // (see the TODO comment in newtab.js), this should assert on the
+      // *Edge* URL instead of falling back to the CWS one.
+      assert.ok(sharedData.text.includes('chromewebstore.google.com'), 'currently falls back to the CWS link until the Edge listing is live');
+    });
+
     it('shares without a photo file when canShare rejects file attachments', async () => {
       window.navigator.canShare = () => false;
       let sharedData;
