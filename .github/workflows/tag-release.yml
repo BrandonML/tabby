@@ -1,0 +1,38 @@
+name: Tag release
+
+# manifest.json and package.json are always bumped together by
+# scripts/release.js, so manifest.json's version is the single source of
+# truth for "what version just landed on main." Runs on every push to main
+# and no-ops if that version is already tagged, so it's safe to fire on
+# every merge rather than needing to detect "was this a release commit."
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push a version tag if one doesn't already exist
+        run: |
+          set -e
+          VERSION=$(node -p "require('./manifest.json').version")
+          TAG="v$VERSION"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists -- nothing to do."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Created and pushed $TAG."
