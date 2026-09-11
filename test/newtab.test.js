@@ -230,10 +230,8 @@ describe('newtab.js DOM manipulation', () => {
       await new Promise(r => setTimeout(r, 10));
 
       assert.ok(sharedData);
-      // TODO: once TABBY_EDGE_URL points at the real Edge Add-ons listing
-      // (see the TODO comment in newtab.js), this should assert on the
-      // *Edge* URL instead of falling back to the CWS one.
-      assert.ok(sharedData.text.includes('chromewebstore.google.com'), 'currently falls back to the CWS link until the Edge listing is live');
+      assert.ok(sharedData.text.includes('microsoftedge.microsoft.com/addons'), 'Edge users should get the Edge Add-ons link, not the CWS one');
+      assert.ok(!sharedData.text.includes('chromewebstore.google.com'), 'must not also include the Chrome Web Store link');
     });
 
     it('shares without a photo file when canShare rejects file attachments', async () => {
