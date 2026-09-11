@@ -208,8 +208,14 @@ async function bodyOf(request) {
 const PHOTO_THUMB_ALLOWED_HOST = "cdn.rescuegroups.org";
 const PHOTO_THUMB_WIDTH = 100;
 const PHOTO_THUMB_MAX_BYTES = 200 * 1024; // generous for a ~100px-wide jpeg
+// A shared photo (GitHub issue #27) is actually looked at, unlike the
+// analysis-only thumbnail above -- 100px would render as a blurry postage
+// stamp in a share sheet. 640px matches a typical social-preview image size;
+// the byte cap is scaled up to match a jpeg at that size with headroom.
+const PHOTO_SHARE_WIDTH = 640;
+const PHOTO_SHARE_MAX_BYTES = 700 * 1024;
 
-export function buildPhotoThumbUrl(rawUrl) {
+function buildPhotoProxyUrl(rawUrl, width) {
   let parsed;
   try {
     parsed = new URL(String(rawUrl));
@@ -219,14 +225,23 @@ export function buildPhotoThumbUrl(rawUrl) {
   if (parsed.protocol !== "https:" || parsed.hostname !== PHOTO_THUMB_ALLOWED_HOST) return null;
   // Discard any caller-supplied query (including a caller-supplied width)
   // before enforcing our own -- the whole point is that this can only ever
-  // request a small image, never the real one.
+  // request a fixed, known-safe image size, never whatever the caller asks
+  // for, so this can't become a general-purpose open proxy.
   parsed.search = "";
-  parsed.searchParams.set("width", String(PHOTO_THUMB_WIDTH));
+  parsed.searchParams.set("width", String(width));
   return parsed.toString();
 }
 
-async function sendPhotoThumb(response, requestOrigin, rawUrl) {
-  const upstreamUrl = buildPhotoThumbUrl(rawUrl);
+export function buildPhotoThumbUrl(rawUrl) {
+  return buildPhotoProxyUrl(rawUrl, PHOTO_THUMB_WIDTH);
+}
+
+export function buildPhotoShareUrl(rawUrl) {
+  return buildPhotoProxyUrl(rawUrl, PHOTO_SHARE_WIDTH);
+}
+
+async function sendPhotoProxy(response, requestOrigin, rawUrl, buildUrl, maxBytes) {
+  const upstreamUrl = buildUrl(rawUrl);
   if (!upstreamUrl) return send(response, 400, { error: "Invalid photo URL." }, requestOrigin);
 
   try {
@@ -241,7 +256,7 @@ async function sendPhotoThumb(response, requestOrigin, rawUrl) {
     // than streaming with a running byte-counter) matches that existing
     // trust level instead of adding a second, inconsistent defense here.
     const buffer = Buffer.from(await upstreamResponse.arrayBuffer());
-    if (buffer.length > PHOTO_THUMB_MAX_BYTES) return send(response, 502, { error: "Photo too large." }, requestOrigin);
+    if (buffer.length > maxBytes) return send(response, 502, { error: "Photo too large." }, requestOrigin);
 
     response.writeHead(200, {
       "Content-Type": contentType,
@@ -252,7 +267,7 @@ async function sendPhotoThumb(response, requestOrigin, rawUrl) {
     });
     response.end(buffer);
   } catch (error) {
-    console.error("[tabby-server] photo-thumb proxy failed", { message: error.message });
+    console.error("[tabby-server] photo proxy failed", { message: error.message });
     return send(response, 502, { error: "Unable to fetch photo." }, requestOrigin);
   }
 }
@@ -276,7 +291,12 @@ export const server = createServer(async (request, response) => {
   if (request.url.startsWith("/api/photo-thumb")) {
     if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
     const requestUrl = new URL(request.url, "http://internal");
-    return sendPhotoThumb(response, origin, requestUrl.searchParams.get("url") || "");
+    return sendPhotoProxy(response, origin, requestUrl.searchParams.get("url") || "", buildPhotoThumbUrl, PHOTO_THUMB_MAX_BYTES);
+  }
+  if (request.url.startsWith("/api/photo-share")) {
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
+    const requestUrl = new URL(request.url, "http://internal");
+    return sendPhotoProxy(response, origin, requestUrl.searchParams.get("url") || "", buildPhotoShareUrl, PHOTO_SHARE_MAX_BYTES);
   }
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });

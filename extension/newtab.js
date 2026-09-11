@@ -28,6 +28,9 @@ const TALL_PORTRAIT_HEIGHT_RATIO = 1.35;
 // signal (a flat/textureless photo scores at or near 1.0).
 const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
+const PHOTO_SHARE_TIMEOUT_MS = 6000;
+const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
+const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
@@ -341,19 +344,95 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   }
   content.appendChild(rescueP);
 
-  if (profileUrl) {
-    const profileA = document.createElement("a");
-    profileA.className = "profile";
-    profileA.href = profileUrl;
-    profileA.target = "_blank";
-    profileA.rel = "noreferrer";
-    profileA.textContent = "View profile";
-    content.appendChild(profileA);
+  const shareUrl = profileUrl || rescueUrl;
+  if (profileUrl || shareUrl) {
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    if (profileUrl) {
+      const profileA = document.createElement("a");
+      profileA.className = "profile";
+      profileA.href = profileUrl;
+      profileA.target = "_blank";
+      profileA.rel = "noreferrer";
+      profileA.textContent = "View profile";
+      actions.appendChild(profileA);
+    }
+
+    if (shareUrl && typeof navigator.share === "function") {
+      const shareButton = document.createElement("button");
+      shareButton.type = "button";
+      shareButton.className = "share";
+      shareButton.textContent = `Share ${card.name}`;
+      shareButton.addEventListener("click", () => shareCard(card, shareUrl));
+      actions.appendChild(shareButton);
+    }
+
+    content.appendChild(actions);
   }
 
   cardContainer.appendChild(content);
 
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
+}
+
+function buildShareText(card) {
+  const meta = [card.breed, card.age, card.sex].filter(Boolean).join(", ");
+  const intro = meta ? `${card.name} (${meta}) is looking for a home at ${card.rescueName}.` : `${card.name} is looking for a home at ${card.rescueName}.`;
+  return `${intro}\n\n${TABBY_TAGLINE} Get Tabby: ${TABBY_CWS_URL}`;
+}
+
+const IMAGE_CONTENT_TYPE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+
+// RescueGroups' CDN has no CORS headers (see applyContentAwareCrop's comment
+// above), so a client-side fetch of the photo itself would be opaque/blocked
+// the same way a canvas read would be -- routing through our own
+// /api/photo-share proxy (CORS-safe, hostname-locked, forced to a
+// share-appropriate size server-side) is what makes a real File object
+// obtainable here at all.
+async function fetchSharePhoto(imageUrl) {
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
+  const response = await fetch(`${backendUrl}/api/photo-share?url=${encodeURIComponent(imageUrl)}`, { signal: AbortSignal.timeout(PHOTO_SHARE_TIMEOUT_MS) });
+  if (!response.ok) throw new Error("Could not fetch photo for sharing.");
+  const blob = await response.blob();
+  const extension = IMAGE_CONTENT_TYPE_EXTENSIONS[blob.type] || "jpg";
+  return new File([blob], `cat.${extension}`, { type: blob.type || "image/jpeg" });
+}
+
+async function copyShareTextFallback(text, url) {
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    showNotice("Copied to clipboard.");
+  } catch (error) {
+    console.error("[tabby]", error);
+    showNotice("Unable to share right now.", { type: "error" });
+  }
+}
+
+// Tries to attach the actual photo (issue #27 calls this the most important
+// part of the share), then degrades in two steps if that's not possible:
+// first to a link-only native share, then -- if navigator.share itself
+// fails or was never available -- to copying the details to the clipboard.
+async function shareCard(card, shareUrl) {
+  const text = buildShareText(card);
+  const shareData = { title: `Meet ${card.name}`, text, url: shareUrl };
+
+  try {
+    const photoFile = await fetchSharePhoto(card.imageUrl);
+    if (navigator.canShare?.({ files: [photoFile] })) {
+      shareData.files = [photoFile];
+    }
+  } catch (error) {
+    console.error("[tabby]", error); // Photo unavailable -- share the link and text without it.
+  }
+
+  try {
+    await navigator.share(shareData);
+  } catch (error) {
+    if (error?.name === "AbortError") return; // The user closed the share sheet -- not a failure.
+    console.error("[tabby]", error);
+    await copyShareTextFallback(text, shareUrl);
+  }
 }
 
 async function resolveLocation(settings, promptForLocation) {
