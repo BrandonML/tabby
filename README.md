@@ -52,9 +52,9 @@ This bumps `manifest.json`/`package.json` to the given version and zips `manifes
 
 ## CI/CD
 
-Three GitHub Actions workflows automate the release process end to end:
+Three GitHub Actions workflows automate the release process end to end — see [RELEASE.md](RELEASE.md) for the step-by-step runbook:
 
-- **`ci.yml`** — runs `npm test` on every push and pull request to `main`/`dev`, pinned to Node 22 to match the Dockerfile. Configure this as a **required status check** on `main`'s branch protection rule (Settings → Branches) so a PR can't merge with failing tests — the workflow alone doesn't block a merge, only branch protection does.
+- **`ci.yml`** — runs `npm test` on every push and pull request to `main`/`dev`, pinned to Node 22 to match the Dockerfile. `main` has a ruleset (Settings → Rules → Rulesets) requiring this check to pass and requiring a pull request before merging — the workflow alone doesn't block anything, only the ruleset does.
 - **`tag-release.yml`** — on every push to `main`, tags the commit `v<version>` (read from `manifest.json`) if that tag doesn't already exist. Idempotent, so it's safe to fire on every push rather than needing to detect "was this actually a release."
 - **`deploy-verify.yml`** — on every push to `main` that touches `server/**` or `Dockerfile` (mirroring the `tabby` service's own Northflank build trigger), polls the live `/healthz` endpoint until its `sha` field (see below) matches the pushed commit, then smoke-tests `/api/nearby-cats`, `/api/photo-thumb`, and `/api/photo-share` against production. A **green run is the signal that it's safe to build and submit the release to CWS/EWS** — since Northflank deploys in minutes and store review takes hours, the server is always live and correct well before any user's browser updates to a new extension version, as long as server changes stay additive/backward-compatible with whatever extension version is still in the wild.
 

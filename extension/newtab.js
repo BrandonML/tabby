@@ -30,11 +30,7 @@ const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 const PHOTO_SHARE_TIMEOUT_MS = 6000;
 const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
-// TODO: replace with the real Edge Add-ons listing URL once it's live and
-// public (the store id 0RDCK9VTFG8C does not yet resolve to a working
-// listing as of this writing -- still in review). Falls back to the Chrome
-// Web Store link rather than a broken/placeholder URL in the meantime.
-const TABBY_EDGE_URL = TABBY_CWS_URL;
+const TABBY_EDGE_URL = "https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho";
 const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
 
 // Chromium-based Edge identifies itself with "Edg/" in its user agent (not
