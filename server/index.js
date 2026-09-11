@@ -21,6 +21,59 @@ export const cache = new Map();
 const CACHE_MS = 3 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 
+// Per-IP rate limiting on /api/nearby-cats: the response cache above only
+// helps *repeat* requests for the same location/page, so a script varying
+// postal codes or coordinates would otherwise cost a real RescueGroups call
+// per request, unbounded. A simple in-memory fixed-window counter is
+// architecturally consistent with the cache right above it -- both assume
+// the single-persistent-process deployment target documented in the
+// README, not a distributed/serverless one.
+export const rateLimits = new Map();
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const RATE_LIMIT_MAX = 30;
+// Bounds memory the same way MAX_CACHE_SIZE bounds the response cache --
+// independent of whether the IP key is trustworthy (see clientIp() below),
+// so a flood of distinct/spoofed keys can't grow this unboundedly either.
+const MAX_RATE_LIMIT_ENTRIES = 1000;
+
+// Northflank (and most platforms-as-a-reverse-proxy) terminates the real
+// client connection and forwards to this container, so request.socket
+// .remoteAddress would otherwise be the platform's internal proxy address
+// for every request -- collapsing every real visitor into one shared
+// bucket. Falls back to the socket address for local dev/tests, where
+// there's no proxy in front to set the header.
+function clientIp(request) {
+  const forwarded = request.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return request.socket.remoteAddress || "unknown";
+}
+
+// Test-only: reset the module-level rate-limit state between test runs.
+export function resetRateLimitsForTests() {
+  rateLimits.clear();
+}
+
+// Returns null when the request is allowed, or the number of seconds the
+// client should wait before retrying.
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimits.get(ip);
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimits.set(ip, { count: 1, windowStart: now });
+    return null;
+  }
+  entry.count += 1;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return Math.ceil((entry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000);
+  }
+  if (rateLimits.size > MAX_RATE_LIMIT_ENTRIES) {
+    rateLimits.delete(rateLimits.keys().next().value);
+  }
+  return null;
+}
+
 // Upstream-failure alerting: a 502 here always means something unexpected
 // happened trying to serve a real request (RescueGroups itself failing, a
 // network-level error reaching it, or a genuine bug) — never routine bad
@@ -161,6 +214,14 @@ export const server = createServer(async (request, response) => {
   }
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });
+
+  const retryAfterSeconds = checkRateLimit(clientIp(request));
+  if (retryAfterSeconds !== null) {
+    // The body is never read on this path, so (as with the 408/413 cases
+    // below) the connection can't safely be reused for a next request.
+    return send(response, 429, { error: "Too many requests. Please try again later." }, origin, { "Retry-After": String(retryAfterSeconds), "Connection": "close" });
+  }
+
   try {
     const { location, page } = await bodyOf(request);
     const safeLocation = validateLocation(location);

@@ -38,6 +38,8 @@ Deploying the server is a separate step from packaging the extension; whatever h
 
 The in-memory cache is correct as-is for the intended deployment target: a single persistent Node process (for example Render, Railway, Fly.io, or Northflank). It would need to be replaced with a shared cache (for example KV/Redis) only if the server is ever scaled to multiple concurrent instances, or moved to a serverless/edge platform (Vercel functions, Cloudflare Workers) where in-process state isn't reliably shared or persistent between requests — those platforms would also require restructuring `server/index.js` away from its current `node:http` `createServer` model.
 
+`/api/nearby-cats` is also rate-limited per client IP (30 requests / 5 minutes, in-memory, same deployment assumption as the cache above) — a cache miss costs a real RescueGroups API call, so this bounds how much a script varying postal codes/coordinates can cost regardless of the response cache. The client IP is taken from `X-Forwarded-For` when present (Northflank and similar platforms terminate the real connection and forward, so `request.socket.remoteAddress` alone would otherwise be the platform's internal proxy address for every request), falling back to the raw socket address only when that header is absent, as in local dev. If a future host doesn't set `X-Forwarded-For` in front of this server, every request would be seen as one shared IP.
+
 Once the server has a real HTTPS URL, package the extension with:
 
 ```powershell
