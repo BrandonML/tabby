@@ -18,6 +18,16 @@ const SEEN_REFRESH_RATIO = 0.85;
 // box, and only the genuinely tall tail gets the full treatment.
 const MILD_PORTRAIT_HEIGHT_RATIO = 1.1;
 const TALL_PORTRAIT_HEIGHT_RATIO = 1.35;
+// How much denser the winning row-band's edge energy has to be than the
+// photo's own average row before it's trusted as a real subject signal
+// rather than noise — see applyContentAwareCrop(). Calibrated against a
+// dozen real portrait photos pulled live from the API (including issue
+// #24's own cited example, a 500x1071 cat-dead-center photo that scored
+// 1.12): every other sampled photo scored 1.19+, so 1.10 catches the hard
+// case with a small margin while still requiring a real, non-trivial
+// signal (a flat/textureless photo scores at or near 1.0).
+const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
+const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
@@ -117,6 +127,93 @@ function readingFormat(value) {
   return new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }).format(updatedAt);
 }
 
+// Content-aware crop for portrait photos (GitHub issue #24): the fixed
+// object-position: top anchor (see photo-portrait/-mild in newtab.css)
+// assumes the subject is near the top of the frame, which is often true
+// but not always — a centered or lower subject gets cropped out entirely.
+// This computes a per-photo vertical anchor instead, from a row-wise
+// edge/contrast-energy profile (a crude proxy for "where's the subject":
+// fur, faces, and toys carry more local contrast than a plain floor or
+// wall). Requires reading pixel data, which RescueGroups' CDN images can't
+// give us directly — they send no CORS headers, so a canvas drawn from one
+// via <img> is tainted and getImageData() throws unconditionally. Fetching
+// a small analysis-only thumbnail through our own backend (which does send
+// CORS headers) sidesteps that. Any failure — network, decode, a low-
+// confidence profile — leaves the CSS default (object-position: top)
+// untouched, so the worst case is exactly today's behavior.
+async function applyContentAwareCrop(img, imageUrl) {
+  try {
+    const backendUrl = BACKEND_URL.replace(/\/$/, "");
+    const response = await fetch(`${backendUrl}/api/photo-thumb?url=${encodeURIComponent(imageUrl)}`, {
+      signal: AbortSignal.timeout(PORTRAIT_ANALYSIS_TIMEOUT_MS)
+    });
+    if (!response.ok) return;
+
+    const bitmap = await createImageBitmap(await response.blob());
+    const { width, height } = bitmap;
+    if (width < 4 || height < 4) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0);
+    const { data } = ctx.getImageData(0, 0, width, height);
+
+    const gray = new Float32Array(width * height);
+    for (let i = 0; i < gray.length; i++) {
+      const o = i * 4;
+      gray[i] = 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+    }
+
+    // Per-row gradient-magnitude sum — a crude Sobel-style edge/contrast
+    // energy profile. Rows 0 and height-1 are left at 0 (no neighbor on one
+    // side); negligible for a >=4px-tall image.
+    const rowEnergy = new Float64Array(height);
+    for (let y = 1; y < height - 1; y++) {
+      let energy = 0;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        energy += Math.abs(gray[idx + 1] - gray[idx - 1]) + Math.abs(gray[idx + width] - gray[idx - width]);
+      }
+      rowEnergy[y] = energy;
+    }
+
+    // Slide a band roughly a third of the photo's height (a plausible
+    // subject-fill assumption) down the energy profile and keep the
+    // highest-energy position — smooths out single-row noise spikes into a
+    // contiguous "subject band" instead of chasing one pixel-thin peak.
+    const bandHeight = Math.max(1, Math.round(height * 0.35));
+    let bandSum = 0;
+    for (let y = 0; y < bandHeight; y++) bandSum += rowEnergy[y];
+    let bestSum = bandSum;
+    let bestStart = 0;
+    for (let y = 1; y <= height - bandHeight; y++) {
+      bandSum += rowEnergy[y + bandHeight - 1] - rowEnergy[y - 1];
+      if (bandSum > bestSum) {
+        bestSum = bandSum;
+        bestStart = y;
+      }
+    }
+
+    // Confidence check: is the winning band meaningfully denser than the
+    // photo's own average row, or is this just a flat/noisy image with no
+    // real localized signal to act on? Below the threshold, do nothing —
+    // acting on a weak signal risks being *worse* than the current fixed
+    // top anchor, which the "no worse than today" bar doesn't allow.
+    let totalEnergy = 0;
+    for (let y = 0; y < height; y++) totalEnergy += rowEnergy[y];
+    const meanRowEnergy = totalEnergy / height;
+    const bandMeanEnergy = bestSum / bandHeight;
+    if (meanRowEnergy <= 0 || bandMeanEnergy / meanRowEnergy < PORTRAIT_ANALYSIS_MIN_CONFIDENCE) return;
+
+    const centerPercent = Math.min(100, Math.max(0, ((bestStart + bandHeight / 2) / height) * 100));
+    img.style.objectPosition = `50% ${centerPercent.toFixed(1)}%`;
+  } catch {
+    // Network failure, decode failure, timeout — leave the CSS default.
+  }
+}
+
 function getSeenIds(feedCache) {
   return Array.isArray(feedCache?.seenIds) ? feedCache.seenIds : [];
 }
@@ -168,11 +265,13 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     // subject's face/torso in frame, at the cost of some legs/tail. See the
     // MILD/TALL_PORTRAIT_HEIGHT_RATIO comment above for why this is two
     // graduated tiers rather than one.
+    const isPortrait = img.naturalHeight > img.naturalWidth * MILD_PORTRAIT_HEIGHT_RATIO;
     if (img.naturalHeight > img.naturalWidth * TALL_PORTRAIT_HEIGHT_RATIO) {
       img.classList.add("photo-portrait");
-    } else if (img.naturalHeight > img.naturalWidth * MILD_PORTRAIT_HEIGHT_RATIO) {
+    } else if (isPortrait) {
       img.classList.add("photo-portrait-mild");
     }
+    if (isPortrait) applyContentAwareCrop(img, card.imageUrl);
   });
   cardContainer.appendChild(img);
 

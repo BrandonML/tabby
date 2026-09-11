@@ -10,6 +10,7 @@ Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a ne
 - Browser-coordinate lookup with native postal-code fallback.
 - Server-side 25 -> 75 -> 150 -> 250 mile radius ladder, escalating on cumulative deduplicated results until 40 unique cats are found.
 - RescueGroups `available/cats/haspic` query, nearest-first sorting, picture validation, organization join, and safe profile-url fallback.
+- Content-aware crop for portrait photos: a row-wise edge-energy heuristic finds the likely subject band instead of always anchoring to the top, via a small hostname-locked analysis-thumbnail proxy (`GET /api/photo-thumb`) that works around RescueGroups' CDN sending no CORS headers.
 - No third-party runtime dependencies; Node's built-in test runner.
 
 ## Run locally

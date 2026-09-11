@@ -196,6 +196,67 @@ async function bodyOf(request) {
   }
 }
 
+// Content-aware portrait crop (GitHub issue #24): the extension wants to
+// read pixel data from a photo to find where the subject actually is, but
+// RescueGroups' CDN sends no CORS headers on its images, so a client-side
+// canvas drawn from one directly is tainted -- getImageData() throws,
+// unconditionally, no workaround. Proxying a small analysis-only thumbnail
+// through our own origin (which *does* send CORS headers) is the only way
+// to make the pixels readable at all. Hostname-locked to RescueGroups' own
+// CDN and forced to a small width regardless of what the caller asks for,
+// so this can't become a general-purpose open proxy.
+const PHOTO_THUMB_ALLOWED_HOST = "cdn.rescuegroups.org";
+const PHOTO_THUMB_WIDTH = 100;
+const PHOTO_THUMB_MAX_BYTES = 200 * 1024; // generous for a ~100px-wide jpeg
+
+export function buildPhotoThumbUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl));
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== PHOTO_THUMB_ALLOWED_HOST) return null;
+  // Discard any caller-supplied query (including a caller-supplied width)
+  // before enforcing our own -- the whole point is that this can only ever
+  // request a small image, never the real one.
+  parsed.search = "";
+  parsed.searchParams.set("width", String(PHOTO_THUMB_WIDTH));
+  return parsed.toString();
+}
+
+async function sendPhotoThumb(response, requestOrigin, rawUrl) {
+  const upstreamUrl = buildPhotoThumbUrl(rawUrl);
+  if (!upstreamUrl) return send(response, 400, { error: "Invalid photo URL." }, requestOrigin);
+
+  try {
+    const upstreamResponse = await fetch(upstreamUrl, { signal: AbortSignal.timeout(5000) });
+    if (!upstreamResponse.ok) return send(response, 502, { error: "Unable to fetch photo." }, requestOrigin);
+
+    const contentType = upstreamResponse.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) return send(response, 502, { error: "Unexpected upstream content." }, requestOrigin);
+
+    // RescueGroups' CDN is hostname-locked and trusted elsewhere in this
+    // file the same way -- buffering fully before the size check (rather
+    // than streaming with a running byte-counter) matches that existing
+    // trust level instead of adding a second, inconsistent defense here.
+    const buffer = Buffer.from(await upstreamResponse.arrayBuffer());
+    if (buffer.length > PHOTO_THUMB_MAX_BYTES) return send(response, 502, { error: "Photo too large." }, requestOrigin);
+
+    response.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": buffer.length,
+      "Cache-Control": "public, max-age=86400",
+      "Access-Control-Allow-Origin": resolveAllowOrigin(requestOrigin),
+      "Vary": "Origin"
+    });
+    response.end(buffer);
+  } catch (error) {
+    console.error("[tabby-server] photo-thumb proxy failed", { message: error.message });
+    return send(response, 502, { error: "Unable to fetch photo." }, requestOrigin);
+  }
+}
+
 function cacheKey(location, page) {
   const base = location.postalcode ? `zip:${location.postalcode}` : `coord:${location.lat.toFixed(2)},${location.lon.toFixed(2)}`;
   return `${base}:p${page}`;
@@ -211,6 +272,11 @@ export const server = createServer(async (request, response) => {
   if (request.url === "/healthz") {
     if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
     return send(response, 200, { status: "ok" }, origin);
+  }
+  if (request.url.startsWith("/api/photo-thumb")) {
+    if (request.method !== "GET") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "GET" });
+    const requestUrl = new URL(request.url, "http://internal");
+    return sendPhotoThumb(response, origin, requestUrl.searchParams.get("url") || "");
   }
   if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });

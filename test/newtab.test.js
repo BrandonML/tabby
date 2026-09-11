@@ -287,6 +287,116 @@ describe('newtab.js DOM manipulation', () => {
     assert.ok(img.classList.contains('photo-portrait'));
     assert.equal(img.classList.contains('photo-portrait-mild'), false, 'a tall portrait should not also carry the mild class');
   });
+
+  describe('content-aware crop', () => {
+    const WIDTH = 20;
+    const HEIGHT = 40;
+
+    // JSDOM doesn't implement a real 2D canvas context, so getContext() is
+    // stubbed to return a fake one whose getImageData() hands back
+    // synthetic pixel data with a controlled energy profile, instead of
+    // whatever drawImage() would have actually rendered.
+    function stubCanvasWithPixels(pixelFn) {
+      window.HTMLCanvasElement.prototype.getContext = function () {
+        return {
+          drawImage() {},
+          getImageData(x, y, width, height) {
+            const data = new Uint8ClampedArray(width * height * 4);
+            for (let py = 0; py < height; py++) {
+              for (let px = 0; px < width; px++) {
+                const value = pixelFn(px, py);
+                const o = (py * width + px) * 4;
+                data[o] = data[o + 1] = data[o + 2] = value;
+                data[o + 3] = 255;
+              }
+            }
+            return { data, width, height };
+          }
+        };
+      };
+    }
+
+    function loadPortraitImage() {
+      window.renderCard({ name: "Milo", imageUrl: "https://cdn.rescuegroups.org/pic.jpg" });
+      const img = document.querySelector('.photo');
+      Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 700, configurable: true }); // tall portrait
+      img.dispatchEvent(new window.Event('load'));
+      return img;
+    }
+
+    it('anchors to a high-contrast band instead of the default top when the signal is strong', async () => {
+      window.fetch = async () => ({ ok: true, blob: async () => ({}) });
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      // Uniform everywhere except a strong checkerboard band at rows 10-19
+      // (25%-50% of the image height) -- real subject-like local contrast
+      // against a flat background.
+      stubCanvasWithPixels((x, y) => (y >= 10 && y < 20 ? ((x + y) % 2 === 0 ? 0 : 255) : 100));
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.ok(img.style.objectPosition, 'a strong signal should set an explicit object-position');
+      const percent = Number(img.style.objectPosition.split(' ')[1].replace('%', ''));
+      assert.ok(percent > 15 && percent < 60, `expected the anchor near the 25%-50% band, got ${percent}%`);
+    });
+
+    it('leaves the CSS default untouched when the photo has no localized signal (uniform)', async () => {
+      window.fetch = async () => ({ ok: true, blob: async () => ({}) });
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      stubCanvasWithPixels(() => 128); // perfectly flat -- zero edge energy anywhere
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '', 'a flat photo has no basis for overriding the default top anchor');
+    });
+
+    it('leaves the CSS default untouched when the analysis fetch fails', async () => {
+      window.fetch = async () => ({ ok: false });
+      window.createImageBitmap = async () => { throw new Error('should not be called'); };
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '');
+    });
+
+    it('leaves the CSS default untouched when the analysis fetch throws (network error)', async () => {
+      window.fetch = async () => { throw new Error('network down'); };
+
+      const img = loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(img.style.objectPosition, '');
+    });
+
+    it('requests the analysis thumbnail through the backend proxy, not RescueGroups directly', async () => {
+      let requestedUrl;
+      window.fetch = async (url) => { requestedUrl = url; return { ok: true, blob: async () => ({}) }; };
+      window.createImageBitmap = async () => ({ width: WIDTH, height: HEIGHT });
+      stubCanvasWithPixels(() => 128);
+
+      loadPortraitImage();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(requestedUrl, 'http://localhost:8787/api/photo-thumb?url=https%3A%2F%2Fcdn.rescuegroups.org%2Fpic.jpg');
+    });
+
+    it('does not run at all for a landscape or square photo', async () => {
+      let fetchCalled = false;
+      window.fetch = async () => { fetchCalled = true; return { ok: true, blob: async () => ({}) }; };
+
+      window.renderCard({ name: "Milo", imageUrl: "https://cdn.rescuegroups.org/pic.jpg" });
+      const img = document.querySelector('.photo');
+      Object.defineProperty(img, 'naturalWidth', { value: 800, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true });
+      img.dispatchEvent(new window.Event('load'));
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert.equal(fetchCalled, false);
+    });
+  });
   it('getSeenIds treats a null or missing feedCache as no seen ids', () => {
     assert.deepEqual(window.getSeenIds(null), []);
     assert.deepEqual(window.getSeenIds(undefined), []);
