@@ -199,6 +199,10 @@ input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px
 }
 .notice.notice-error { color: var(--stamp); }
 .notice a { color: inherit; }
+/* Message text plus any links wrap together as one run of text -- see
+   buildNoticeLinkButton()/showNotice() in newtab.js for why this can't just
+   be a flex item like the icon (GitHub issue #29). */
+.notice-body { flex: 1 1 auto; min-width: 0; }
 .notice-link { color: var(--moss-dark); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; background: none; border: none; padding: 0; cursor: pointer; font: inherit; }
 .notice-link:hover { background: none; }
 

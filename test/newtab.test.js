@@ -53,30 +53,57 @@ describe('newtab.js DOM manipulation', () => {
 
   it('showNotice creates safe DOM elements without innerHTML', () => {
     // Call showNotice on the window context
-    window.showNotice("Hello World", { linkText: "Click Me", linkAction: "open-settings" });
+    window.showNotice("Hello World", { links: [{ text: "Click Me", action: "open-settings" }] });
 
     const notice = document.getElementById("notice");
-    assert.equal(notice.childNodes.length, 2);
+    assert.equal(notice.childNodes.length, 1);
+    const body = notice.childNodes[0];
+    assert.equal(body.className, "notice-body");
+    assert.equal(body.childNodes.length, 2);
 
-    const textNode = notice.childNodes[0];
+    const textNode = body.childNodes[0];
     assert.equal(textNode.nodeType, 3); // TEXT_NODE
     assert.equal(textNode.textContent, "Hello World ");
 
-    const button = notice.childNodes[1];
+    const button = body.childNodes[1];
     assert.equal(button.tagName, "BUTTON");
     assert.equal(button.textContent, "Click Me");
     assert.equal(button.className, "notice-link");
     assert.equal(button.dataset.action, "open-settings");
 
     // Attempt an XSS
-    window.showNotice("<img src=x onerror=alert(1)>", { linkText: "<script>alert(2)</script>", linkAction: '">XSS' });
-    assert.equal(notice.childNodes[0].textContent, "<img src=x onerror=alert(1)> ");
-    assert.equal(notice.childNodes[1].textContent, "<script>alert(2)</script>");
-    assert.equal(notice.childNodes[1].dataset.action, '\">XSS');
+    window.showNotice("<img src=x onerror=alert(1)>", { links: [{ text: "<script>alert(2)</script>", action: '">XSS' }] });
+    const body2 = notice.childNodes[0];
+    assert.equal(body2.childNodes[0].textContent, "<img src=x onerror=alert(1)> ");
+    assert.equal(body2.childNodes[1].textContent, "<script>alert(2)</script>");
+    assert.equal(body2.childNodes[1].dataset.action, '\">XSS');
 
     // Ensure no HTML elements were created by accident
     assert.equal(notice.querySelector('img'), null);
     assert.equal(notice.querySelector('script'), null);
+  });
+
+  it('showNotice splices multiple links inline via {token} placeholders', () => {
+    window.showNotice("Try a different {zip} or {explore}.", {
+      links: [
+        { token: "zip", text: "zip code", action: "open-settings" },
+        { token: "explore", text: "explore another city", action: "start-explore" }
+      ],
+      type: "error"
+    });
+
+    const notice = document.getElementById("notice");
+    const body = notice.querySelector('.notice-body');
+    const links = body.querySelectorAll('.notice-link');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].textContent, "zip code");
+    assert.equal(links[0].dataset.action, "open-settings");
+    assert.equal(links[1].textContent, "explore another city");
+    assert.equal(links[1].dataset.action, "start-explore");
+    // The full sentence -- including the surrounding words -- must survive
+    // as one continuous run of text with the links spliced in place, not
+    // just the two link labels floating with the rest of the text dropped.
+    assert.equal(body.textContent, "Try a different zip code or explore another city.");
   });
 
   it('renderCard creates safe DOM elements without innerHTML', () => {
@@ -546,6 +573,37 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(card.hidden, true);
       assert.ok(notice.textContent.includes('No available cats'));
       assert.ok(notice.classList.contains('notice-error'), "an empty-results notice needs the user to act, so it should read as an error");
+    });
+
+    it('offers both a zip-code and an explore-another-city link on empty results (GitHub issue #29)', async () => {
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({ cards: [], radiusMiles: 5 })
+      });
+
+      await window.refresh({ postalcode: '12345' });
+      const notice = document.getElementById("notice");
+      const links = notice.querySelectorAll('.notice-link');
+      assert.equal(links.length, 2);
+      assert.equal(links[0].textContent, 'zip code');
+      assert.equal(links[0].dataset.action, 'open-settings');
+      assert.equal(links[1].textContent, 'explore another city');
+      assert.equal(links[1].dataset.action, 'start-explore');
+      // The links must read as part of one flowing sentence, not floating
+      // text disconnected from the surrounding message.
+      assert.equal(notice.querySelector('.notice-body').textContent, 'No available cats were found within 5 miles. Try using a different zip code or explore another city.');
+
+      let fetchedBody;
+      window.fetch = async (url, opts) => {
+        fetchedBody = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ cards: [{ id: 'explore-1', name: 'ExploreCat' }], radiusMiles: 25 }) };
+      };
+      links[1].dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.ok(fetchedBody, 'clicking "explore another city" should trigger the same explore fetch as the header Explore button');
+      assert.equal(document.getElementById('card').querySelector('h1').textContent, 'ExploreCat');
+      assert.equal(document.getElementById('explore-banner').hidden, false);
     });
 
     it('resets to page 1 when a later page comes back exhausted and empty', async () => {

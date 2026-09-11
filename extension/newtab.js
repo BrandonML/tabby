@@ -30,6 +30,11 @@ const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
+const ZIP_SETTINGS_LINK = { text: "zip code", action: "open-settings" };
+const NO_RESULTS_LINKS = [
+  { ...ZIP_SETTINGS_LINK, token: "zip" },
+  { text: "explore another city", action: "start-explore", token: "explore" }
+];
 
 // Well-known US metro coordinates, chosen for broad RescueGroups coverage.
 // Not individually spot-checked against the live API — a location with no
@@ -77,7 +82,28 @@ function showExploreBanner(label) {
 function hideExploreBanner() {
   $("explore-banner").hidden = true;
 }
-function showNotice(message, { linkText = null, linkAction = null, type = "info" } = {}) {
+function buildNoticeLinkButton(link) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "notice-link";
+  button.dataset.action = link.action;
+  button.textContent = link.text;
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (link.action === "open-settings") openSettings();
+    else if (link.action === "report-issue") window.open("https://github.com/BrandonML/tabby/issues", "_blank", "noopener,noreferrer");
+    else if (link.action === "start-explore") startExplore();
+  });
+  return button;
+}
+
+// `links` is `[{ text, action, token? }]`. When a link has a `token` and the
+// message contains a matching `{token}`, the button is spliced in at that
+// exact spot (needed for a message with more than one link, e.g. "...try a
+// different {zip} or {explore}."). Otherwise every link is appended after
+// the message in order -- the common single-link case, unchanged from
+// before this supported multiple links.
+function showNotice(message, { links = [], type = "info" } = {}) {
   const notice = $("notice");
   if (!notice) return;
 
@@ -96,26 +122,37 @@ function showNotice(message, { linkText = null, linkAction = null, type = "info"
     notice.appendChild(icon);
   }
 
-  if (linkText && linkAction) {
-    notice.appendChild(document.createTextNode(`${message} `));
+  // The message and any links live in one wrapping element so they flow as
+  // normal text -- a link mid-sentence, wrapping with the words around it --
+  // instead of `.notice`'s flex layout treating each one as its own row item
+  // with a fixed gap, which is what made a trailing link look like a
+  // detached chip rather than part of the sentence (GitHub issue #29).
+  const body = document.createElement("span");
+  body.className = "notice-body";
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "notice-link";
-    button.dataset.action = linkAction;
-    button.textContent = linkText;
-
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (linkAction === "open-settings") openSettings();
-      else if (linkAction === "report-issue") window.open("https://github.com/BrandonML/tabby/issues", "_blank", "noopener,noreferrer");
+  const hasMatchingToken = links.some((link) => link.token && message.includes(`{${link.token}}`));
+  if (links.length > 0 && hasMatchingToken) {
+    const tokenPattern = /\{(\w+)\}/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tokenPattern.exec(message))) {
+      if (match.index > lastIndex) body.appendChild(document.createTextNode(message.slice(lastIndex, match.index)));
+      const link = links.find((l) => l.token === match[1]);
+      body.appendChild(link ? buildNoticeLinkButton(link) : document.createTextNode(match[0]));
+      lastIndex = tokenPattern.lastIndex;
+    }
+    if (lastIndex < message.length) body.appendChild(document.createTextNode(message.slice(lastIndex)));
+  } else if (links.length > 0) {
+    body.appendChild(document.createTextNode(`${message} `));
+    links.forEach((link, i) => {
+      body.appendChild(buildNoticeLinkButton(link));
+      if (i < links.length - 1) body.appendChild(document.createTextNode(" "));
     });
-
-    notice.appendChild(button);
-    return;
+  } else {
+    body.appendChild(document.createTextNode(message));
   }
 
-  notice.appendChild(document.createTextNode(message));
+  notice.appendChild(body);
 }
 function readingFormat(value) {
   if (!value) return "";
@@ -426,7 +463,7 @@ async function refresh(location, locationLabel) {
   if (!mergedCards.length) {
     setCardVisible(false);
     $("location-panel").hidden = true;
-    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+    showNotice(`No available cats were found within ${nextCache.radiusMiles} miles. Try using a different {zip} or {explore}.`, { links: NO_RESULTS_LINKS, type: "error" });
     return;
   }
   // Every card in mergedCards is guaranteed unseen (seen ones were dropped,
@@ -456,13 +493,13 @@ async function _start({ requestLocation = false } = {}) {
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: shouldRefresh, locationLabel });
   } else if (feedCache && !feedCache.cards?.length) {
-    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different zip code instead.`, { linkText: "zip code", linkAction: "open-settings", type: "error" });
+    showNotice(`No available cats were found within ${feedCache.radiusMiles || 0} miles. Try using a different {zip} or {explore}.`, { links: NO_RESULTS_LINKS, type: "error" });
   }
   const location = await resolveLocation(resolvedSettings, requestLocation);
   if (!location) {
     $("location-panel").hidden = false;
     if (requestLocation) {
-      showNotice("Unable to determine your location. Try entering a zip code instead.", { linkText: "zip code", linkAction: "open-settings", type: "error" });
+      showNotice("Unable to determine your location. Try entering a {zip} instead.", { links: [{ ...ZIP_SETTINGS_LINK, token: "zip" }], type: "error" });
     }
     return;
   }
@@ -475,8 +512,8 @@ async function _start({ requestLocation = false } = {}) {
       // a user issue, so it keeps the settings shortcut instead — the
       // report-issue link is for failures that might actually be our bug.
       const noticeOptions = isInvalidZipError(error.message)
-        ? { linkText: "zip code", linkAction: "open-settings", type: "error" }
-        : { linkText: "Report an issue", linkAction: "report-issue", type: "error" };
+        ? { links: [ZIP_SETTINGS_LINK], type: "error" }
+        : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
       showNotice(finalMessage, noticeOptions);
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
@@ -528,6 +565,11 @@ async function exploreArea() {
   }
 }
 
+async function startExplore() {
+  showNotice("Exploring a new area…");
+  await exploreArea();
+}
+
 function showAnotherExploreCard() {
   if (!exploreBatch) return;
   const { selected, nextSeenIds } = nextCard(exploreBatch.cards, exploreBatch.seenIds);
@@ -553,10 +595,7 @@ $("use-location").addEventListener("click", async () => {
   await start({ requestLocation: true });
 });
 $("open-settings").addEventListener("click", openSettings);
-$("explore").addEventListener("click", async () => {
-  showNotice("Exploring a new area…");
-  await exploreArea();
-});
+$("explore").addEventListener("click", startExplore);
 $("show-another-explore-cat").addEventListener("click", () => showAnotherExploreCard());
 $("back-to-my-area").addEventListener("click", async () => {
   exploreBatch = null;
