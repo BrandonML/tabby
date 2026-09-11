@@ -98,22 +98,25 @@ function relationshipResources(relationship, type, index) {
   return ids.map((item) => index.get(`${type}:${item.id}`)).filter(Boolean);
 }
 
+// Pictures are pre-sorted by `order`; returns the first one whose large/
+// original URL actually normalizes to something usable, or null if none do.
+function getBestPicture(pictures) {
+  for (const item of pictures.map((p) => p.attributes || {})) {
+    const imageUrl = normalizeUrl(item.large?.url || item.original?.url);
+    if (imageUrl) return { picture: item, imageUrl };
+  }
+  return null;
+}
+
 export function normalizeCards(payload) {
   const index = includedIndex(payload.included);
   return (payload.data || []).map((animal) => {
     const relationships = animal.relationships || {};
     const pictures = relationshipResources(relationships.pictures, "pictures", index)
       .sort((a, b) => (a.attributes?.order ?? Number.MAX_SAFE_INTEGER) - (b.attributes?.order ?? Number.MAX_SAFE_INTEGER));
-    let picture, imageUrl;
-    for (const item of pictures.map((p) => p.attributes || {})) {
-      const rawImg = item.large?.url || item.original?.url;
-      imageUrl = normalizeUrl(rawImg);
-      if (imageUrl) {
-        picture = item;
-        break;
-      }
-    }
-    if (!picture) return null;
+    const best = getBestPicture(pictures);
+    if (!best) return null;
+    const { picture, imageUrl } = best;
     const org = relationshipResources(relationships.orgs, "orgs", index)[0];
     const attrs = animal.attributes || {};
     const updatedAt = newestTimestamp(attrs.updatedDate, attrs.updatedAt);
