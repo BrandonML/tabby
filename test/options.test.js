@@ -218,7 +218,7 @@ describe('options.js settings logic', () => {
     assert.equal(saved.textContent, 'Saved.');
   });
 
-  it('closes settings when close button clicked', async () => {
+  it('closes settings when close button clicked (fallback: no active tab found)', async () => {
     let closeCalled = false;
     window.close = () => { closeCalled = true; };
     const closeBtn = document.getElementById('close-settings');
@@ -226,6 +226,26 @@ describe('options.js settings logic', () => {
 
     await new Promise(r => setTimeout(r, 10));
     assert.ok(closeCalled);
+  });
+
+  it('closes settings by replacing the active tab with newtab.html (the primary path)', async () => {
+    let createArgs;
+    let removedTabId;
+    window.chrome.tabs.query = (query, cb) => cb([{ id: 7 }]);
+    window.chrome.tabs.create = (opts, cb) => { createArgs = opts; if (cb) cb(); };
+    window.chrome.tabs.remove = (id) => { removedTabId = id; };
+
+    let closeCalled = false;
+    window.close = () => { closeCalled = true; };
+
+    const closeBtn = document.getElementById('close-settings');
+    closeBtn.dispatchEvent(new window.Event('click'));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.deepEqual(createArgs, { url: 'chrome-extension://id/extension/newtab.html', active: true });
+    assert.equal(removedTabId, 7);
+    assert.equal(closeCalled, false, 'the fallback window.close() must not run when an active tab was found');
   });
 
   it('submitting a blank ZIP is a no-op', async () => {
