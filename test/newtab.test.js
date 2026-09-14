@@ -218,7 +218,7 @@ describe('newtab.js DOM manipulation', () => {
         const menu = openShareMenu();
         assert.ok(menu, 'clicking the share button should open the menu');
         const labels = [...menu.querySelectorAll('.share-menu-item')].map(el => el.textContent);
-        assert.deepEqual(labels, ['WhatsApp', 'Email', 'X / Twitter', 'Facebook', 'LinkedIn', 'Copy link', 'More options…']);
+        assert.deepEqual(labels, ['WhatsApp', 'Email', 'X / Twitter', 'Facebook', 'Reddit', 'Pinterest', 'Nextdoor', 'Copy link', 'More options…']);
       });
 
       it('toggles closed when the share button is clicked again', () => {
@@ -258,6 +258,50 @@ describe('newtab.js DOM manipulation', () => {
         assert.equal(document.querySelector('.share-menu'), null);
       });
 
+      it('flips the menu above the button when there is not enough room below it in the viewport', () => {
+        window.navigator.share = async () => {};
+        Object.defineProperty(window, 'innerHeight', { value: 400, configurable: true });
+        Object.defineProperty(window, 'innerWidth', { value: 800, configurable: true });
+        const originalRect = window.HTMLElement.prototype.getBoundingClientRect;
+        window.HTMLElement.prototype.getBoundingClientRect = function () {
+          if (this.classList.contains('share')) return { top: 350, bottom: 390, left: 100, right: 300, width: 200, height: 40 };
+          if (this.classList.contains('share-menu')) return { top: 0, bottom: 0, left: 0, right: 0, width: 190, height: 300 };
+          return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+        };
+
+        let menu;
+        try {
+          window.renderCard(shareCardData);
+          menu = openShareMenu();
+        } finally {
+          window.HTMLElement.prototype.getBoundingClientRect = originalRect;
+        }
+
+        assert.ok(parseFloat(menu.style.top) < 350, 'a menu opening below the button here would run off the bottom of a 400px-tall viewport');
+      });
+
+      it('positions the menu below the button when there is enough room', () => {
+        window.navigator.share = async () => {};
+        Object.defineProperty(window, 'innerHeight', { value: 1000, configurable: true });
+        Object.defineProperty(window, 'innerWidth', { value: 800, configurable: true });
+        const originalRect = window.HTMLElement.prototype.getBoundingClientRect;
+        window.HTMLElement.prototype.getBoundingClientRect = function () {
+          if (this.classList.contains('share')) return { top: 200, bottom: 240, left: 100, right: 300, width: 200, height: 40 };
+          if (this.classList.contains('share-menu')) return { top: 0, bottom: 0, left: 0, right: 0, width: 190, height: 300 };
+          return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+        };
+
+        let menu;
+        try {
+          window.renderCard(shareCardData);
+          menu = openShareMenu();
+        } finally {
+          window.HTMLElement.prototype.getBoundingClientRect = originalRect;
+        }
+
+        assert.equal(menu.style.top, '246px');
+      });
+
       it('opens WhatsApp with the composed message', () => {
         let openedUrl;
         window.open = (url) => { openedUrl = url; };
@@ -269,14 +313,19 @@ describe('newtab.js DOM manipulation', () => {
         assert.ok(message.includes('https://rescuegroups.org/animals/luna\n\n'), 'the profile link must sit on its own blank-separated line, ahead of the Tabby plug');
       });
 
-      it('opens the mail client with a subject and the composed message as the body', () => {
-        let openedUrl;
-        window.open = (url) => { openedUrl = url; };
-        window.renderCard(shareCardData);
-        clickMenuItem(openShareMenu(), 'Email');
+      it('opens the mail client via a real anchor click (window.open silently fails for mailto: in Chrome) with a subject and the composed message as the body', () => {
+        let clickedHref;
+        const originalClick = window.HTMLAnchorElement.prototype.click;
+        window.HTMLAnchorElement.prototype.click = function () { clickedHref = this.href; };
+        try {
+          window.renderCard(shareCardData);
+          clickMenuItem(openShareMenu(), 'Email');
+        } finally {
+          window.HTMLAnchorElement.prototype.click = originalClick;
+        }
 
-        assert.ok(openedUrl.startsWith('mailto:?subject=Meet%20Luna&body='));
-        const body = decodeURIComponent(openedUrl.split('body=')[1]);
+        assert.ok(clickedHref.startsWith('mailto:?subject=Meet%20Luna&body='));
+        const body = decodeURIComponent(clickedHref.split('body=')[1]);
         assert.ok(body.includes('https://rescuegroups.org/animals/luna'));
         assert.ok(body.includes('Get Tabby:'));
       });
@@ -300,12 +349,37 @@ describe('newtab.js DOM manipulation', () => {
         assert.equal(openedUrl, `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`);
       });
 
-      it('opens the LinkedIn sharer with just the profile url', () => {
+      it('opens the Reddit submit intent with a title and the profile url -- Reddit, unlike Facebook, accepts the title directly', () => {
         let openedUrl;
         window.open = (url) => { openedUrl = url; };
         window.renderCard(shareCardData);
-        clickMenuItem(openShareMenu(), 'LinkedIn');
-        assert.equal(openedUrl, `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`);
+        clickMenuItem(openShareMenu(), 'Reddit');
+        assert.equal(openedUrl, `https://www.reddit.com/submit?url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}&title=${encodeURIComponent('Meet Luna')}`);
+      });
+
+      it('opens the Pinterest pin intent with the photo-share proxy image and a description -- unaffected by the rescue site\'s own Open Graph tags', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Pinterest');
+
+        assert.ok(openedUrl.startsWith('https://www.pinterest.com/pin/create/button/?'));
+        assert.ok(openedUrl.includes(`url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`));
+        const mediaParam = decodeURIComponent(openedUrl.match(/media=([^&]+)/)[1]);
+        assert.ok(mediaParam.includes('/api/photo-share?url='), 'must use the CORS-safe photo-share proxy, not the CDN directly');
+        assert.ok(decodeURIComponent(openedUrl).includes('Luna'));
+      });
+
+      it('opens the Nextdoor share plugin with the composed message as the body', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Nextdoor');
+
+        assert.ok(openedUrl.startsWith('https://nextdoor.com/sharekit/?source=tabby&body='));
+        const body = decodeURIComponent(openedUrl.split('body=')[1]);
+        assert.ok(body.includes('https://rescuegroups.org/animals/luna'));
+        assert.ok(body.includes('Get Tabby:'));
       });
 
       it('copies the composed message to the clipboard', async () => {

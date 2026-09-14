@@ -438,11 +438,18 @@ function buildShareMessage(card, shareUrl) {
   return `${buildShareIntro(card)}\n\n${shareUrl}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
 }
 
-// mailto: goes through here too -- window.open() hands it to the OS mail
-// client the same way a clicked <a href="mailto:"> would, without ever
-// navigating this new-tab page itself.
 function openShareTarget(url) {
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// window.open('mailto:...') is unreliable in Chrome -- it silently does
+// nothing in a lot of real-world configurations. A real anchor click is what
+// browsers actually special-case for handing a non-http(s) scheme off to the
+// OS/registered app without navigating this page.
+function openMailto(url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.click();
 }
 
 async function copyShareLink(card, shareUrl) {
@@ -455,18 +462,30 @@ async function copyShareLink(card, shareUrl) {
   }
 }
 
-// Link-based channels (X/Facebook/LinkedIn) get just the profile URL -- they
-// build their own preview card from that page's Open Graph tags, not from
-// any text Tabby sends, so there's nothing to compose for them. Text-based
-// channels (WhatsApp/email/copy) get the fully composed message so their
+function sharePhotoUrl(card) {
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
+  return `${backendUrl}/api/photo-share?url=${encodeURIComponent(card.imageUrl)}`;
+}
+
+// Facebook only ever takes a URL -- it builds its own preview card by
+// scraping that page's Open Graph tags, not from anything Tabby sends, and
+// most rescues' RescueGroups-hosted pages don't have (correct) OG tags, so
+// this one channel is stuck showing generic/missing content until the
+// cat-details share page (tracked separately) replaces the raw profile link.
+// Reddit and Pinterest sidestep that entirely -- their intents accept the
+// title/image/description directly as params, so they show real cat details
+// regardless of the rescue's own site. Text-composer channels (WhatsApp,
+// email, Nextdoor, copy) get the fully composed message so their
 // content/ordering is exact (issue #35), not left to how a native share
-// target happens to join separate text/url fields together.
+// target happens to join separate text/url fields back together.
 const SHARE_CHANNELS = [
   { label: "WhatsApp", activate: (card, shareUrl) => openShareTarget(`https://wa.me/?text=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
-  { label: "Email", activate: (card, shareUrl) => openShareTarget(`mailto:?subject=${encodeURIComponent(`Meet ${card.name}`)}&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
+  { label: "Email", activate: (card, shareUrl) => openMailto(`mailto:?subject=${encodeURIComponent(`Meet ${card.name}`)}&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
   { label: "X / Twitter", activate: (card, shareUrl) => openShareTarget(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildShareIntro(card))}&url=${encodeURIComponent(shareUrl)}`) },
   { label: "Facebook", activate: (_card, shareUrl) => openShareTarget(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`) },
-  { label: "LinkedIn", activate: (_card, shareUrl) => openShareTarget(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`) },
+  { label: "Reddit", activate: (card, shareUrl) => openShareTarget(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(`Meet ${card.name}`)}`) },
+  { label: "Pinterest", activate: (card, shareUrl) => openShareTarget(`https://www.pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}&media=${encodeURIComponent(sharePhotoUrl(card))}&description=${encodeURIComponent(buildShareIntro(card))}`) },
+  { label: "Nextdoor", activate: (card, shareUrl) => openShareTarget(`https://nextdoor.com/sharekit/?source=tabby&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
   { label: "Copy link", activate: (card, shareUrl) => copyShareLink(card, shareUrl) }
 ];
 
@@ -531,6 +550,23 @@ function buildShareMenuItem(label, onActivate) {
   return item;
 }
 
+// Opens below the button by default, but flips above it when there isn't
+// enough room left in the viewport -- the Share button sits near the bottom
+// of the card, which is often already near the bottom of the screen, so an
+// always-downward menu regularly left its lower items unreachable without
+// scrolling.
+function positionShareMenu(menu, toggleButton) {
+  const rect = toggleButton.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+
+  const fitsBelow = rect.bottom + 6 + menuRect.height <= window.innerHeight - 8;
+  const top = fitsBelow ? rect.bottom + 6 : Math.max(8, rect.top - 6 - menuRect.height);
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuRect.width - 8));
+
+  menu.style.top = `${Math.min(top, window.innerHeight - menuRect.height - 8)}px`;
+  menu.style.left = `${left}px`;
+}
+
 // Rendered into document.body at a fixed position computed from the toggle
 // button's own rect, rather than nested inside it -- .card clips its
 // contents with overflow: hidden (for the photo's rounded corners), which
@@ -552,10 +588,7 @@ function openShareMenu(card, shareUrl, toggleButton) {
   }
 
   document.body.appendChild(menu);
-  const rect = toggleButton.getBoundingClientRect();
-  const menuWidth = menu.getBoundingClientRect().width;
-  menu.style.top = `${rect.bottom + 6}px`;
-  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8))}px`;
+  positionShareMenu(menu, toggleButton);
   toggleButton.setAttribute("aria-expanded", "true");
 
   const onOutsideClick = (event) => {
