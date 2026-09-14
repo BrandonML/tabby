@@ -281,6 +281,7 @@ function nextCard(cards, seenIds = []) {
 }
 
 function renderCard(card, { stale = false, exploreLabel = null, locationLabel = null } = {}) {
+  closeShareMenu(); // a card rebuild (e.g. "Show another cat") orphans any open menu -- close it first
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(" · ");
   // While exploring, distanceMiles is measured from the explored city, not
   // the user — naming that city avoids the number reading as "from you".
@@ -406,13 +407,8 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
       actions.appendChild(profileA);
     }
 
-    if (shareUrl && typeof navigator.share === "function") {
-      const shareButton = document.createElement("button");
-      shareButton.type = "button";
-      shareButton.className = "share";
-      shareButton.textContent = `Share ${card.name}`;
-      shareButton.addEventListener("click", () => shareCard(card, shareUrl));
-      actions.appendChild(shareButton);
+    if (shareUrl) {
+      actions.appendChild(buildShareControl(card, shareUrl));
     }
 
     content.appendChild(actions);
@@ -423,11 +419,56 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   showNotice(stale ? "Showing a recent saved match while we refresh." : "");
 }
 
-function buildShareText(card) {
+function buildShareIntro(card) {
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(", ");
-  const intro = meta ? `${card.name} (${meta}) is looking for a home at ${card.rescueName}.` : `${card.name} is looking for a home at ${card.rescueName}.`;
-  return `${intro}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
+  return meta ? `${card.name} (${meta}) is looking for a home at ${card.rescueName}.` : `${card.name} is looking for a home at ${card.rescueName}.`;
 }
+
+function buildShareText(card) {
+  return `${buildShareIntro(card)}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
+}
+
+// The profile link is embedded directly in the message (ahead of the Tabby
+// plug, both on their own blank-separated line) so every text-based channel
+// below shows the same, deliberately ordered copy (GitHub issue #35).
+// Native share (see shareCard()) can't use this -- it hands `text` and `url`
+// to the target app as two separate fields, and it's the target app, not
+// Tabby, that decides how/where to rejoin them.
+function buildShareMessage(card, shareUrl) {
+  return `${buildShareIntro(card)}\n\n${shareUrl}\n\n${TABBY_TAGLINE} Get Tabby: ${tabbyStoreUrl()}`;
+}
+
+// mailto: goes through here too -- window.open() hands it to the OS mail
+// client the same way a clicked <a href="mailto:"> would, without ever
+// navigating this new-tab page itself.
+function openShareTarget(url) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function copyShareLink(card, shareUrl) {
+  try {
+    await navigator.clipboard.writeText(buildShareMessage(card, shareUrl));
+    showNotice("Copied to clipboard.");
+  } catch (error) {
+    console.error("[tabby]", error);
+    showNotice("Unable to copy the link. Try again.", { type: "error" });
+  }
+}
+
+// Link-based channels (X/Facebook/LinkedIn) get just the profile URL -- they
+// build their own preview card from that page's Open Graph tags, not from
+// any text Tabby sends, so there's nothing to compose for them. Text-based
+// channels (WhatsApp/email/copy) get the fully composed message so their
+// content/ordering is exact (issue #35), not left to how a native share
+// target happens to join separate text/url fields together.
+const SHARE_CHANNELS = [
+  { label: "WhatsApp", activate: (card, shareUrl) => openShareTarget(`https://wa.me/?text=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
+  { label: "Email", activate: (card, shareUrl) => openShareTarget(`mailto:?subject=${encodeURIComponent(`Meet ${card.name}`)}&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
+  { label: "X / Twitter", activate: (card, shareUrl) => openShareTarget(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildShareIntro(card))}&url=${encodeURIComponent(shareUrl)}`) },
+  { label: "Facebook", activate: (_card, shareUrl) => openShareTarget(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`) },
+  { label: "LinkedIn", activate: (_card, shareUrl) => openShareTarget(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`) },
+  { label: "Copy link", activate: (card, shareUrl) => copyShareLink(card, shareUrl) }
+];
 
 const IMAGE_CONTENT_TYPE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 
@@ -444,16 +485,6 @@ async function fetchSharePhoto(imageUrl) {
   const blob = await response.blob();
   const extension = IMAGE_CONTENT_TYPE_EXTENSIONS[blob.type] || "jpg";
   return new File([blob], `cat.${extension}`, { type: blob.type || "image/jpeg" });
-}
-
-async function copyShareTextFallback(text, url) {
-  try {
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    showNotice("Copied to clipboard.");
-  } catch (error) {
-    console.error("[tabby]", error);
-    showNotice("Unable to share right now.", { type: "error" });
-  }
 }
 
 // Tries to attach the actual photo (issue #27 calls this the most important
@@ -478,8 +509,89 @@ async function shareCard(card, shareUrl) {
   } catch (error) {
     if (error?.name === "AbortError") return; // The user closed the share sheet -- not a failure.
     console.error("[tabby]", error);
-    await copyShareTextFallback(text, shareUrl);
+    await copyShareLink(card, shareUrl);
   }
+}
+
+// Reassigned to a real cleanup closure whenever a menu is open, and reset to
+// a no-op once it closes -- renderCard() calls this unconditionally on every
+// rebuild so a stale menu from a previous card never lingers.
+let closeShareMenu = () => {};
+
+function buildShareMenuItem(label, onActivate) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "share-menu-item";
+  item.setAttribute("role", "menuitem");
+  item.textContent = label;
+  item.addEventListener("click", () => {
+    closeShareMenu();
+    onActivate();
+  });
+  return item;
+}
+
+// Rendered into document.body at a fixed position computed from the toggle
+// button's own rect, rather than nested inside it -- .card clips its
+// contents with overflow: hidden (for the photo's rounded corners), which
+// would silently cut off a menu positioned inside that subtree.
+function openShareMenu(card, shareUrl, toggleButton) {
+  const menu = document.createElement("div");
+  menu.className = "share-menu";
+  menu.setAttribute("role", "menu");
+
+  for (const channel of SHARE_CHANNELS) {
+    menu.appendChild(buildShareMenuItem(channel.label, () => channel.activate(card, shareUrl)));
+  }
+  // The one channel that can't be built from a plain URL/mailto -- it needs
+  // whatever's actually registered as a share target on this device (and,
+  // when supported, the photo file itself), which only the Web Share API
+  // has access to.
+  if (typeof navigator.share === "function") {
+    menu.appendChild(buildShareMenuItem("More options…", () => shareCard(card, shareUrl)));
+  }
+
+  document.body.appendChild(menu);
+  const rect = toggleButton.getBoundingClientRect();
+  const menuWidth = menu.getBoundingClientRect().width;
+  menu.style.top = `${rect.bottom + 6}px`;
+  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8))}px`;
+  toggleButton.setAttribute("aria-expanded", "true");
+
+  const onOutsideClick = (event) => {
+    if (!menu.contains(event.target) && event.target !== toggleButton) closeShareMenu();
+  };
+  const onKeydown = (event) => {
+    if (event.key === "Escape") closeShareMenu();
+  };
+  // Deferred so the same click that opened the menu doesn't immediately
+  // close it again via this listener.
+  setTimeout(() => document.addEventListener("click", onOutsideClick), 0);
+  document.addEventListener("keydown", onKeydown);
+
+  closeShareMenu = () => {
+    menu.remove();
+    toggleButton.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", onOutsideClick);
+    document.removeEventListener("keydown", onKeydown);
+    closeShareMenu = () => {};
+  };
+}
+
+function buildShareControl(card, shareUrl) {
+  const shareButton = document.createElement("button");
+  shareButton.type = "button";
+  shareButton.className = "share";
+  shareButton.textContent = `Share ${card.name}`;
+  shareButton.setAttribute("aria-haspopup", "true");
+  shareButton.setAttribute("aria-expanded", "false");
+  shareButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const wasOpen = shareButton.getAttribute("aria-expanded") === "true";
+    closeShareMenu();
+    if (!wasOpen) openShareMenu(card, shareUrl, shareButton);
+  });
+  return shareButton;
 }
 
 async function resolveLocation(settings, promptForLocation) {

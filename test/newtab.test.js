@@ -163,7 +163,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(h1.classList.contains('name-long'), false);
     });
   });
-  describe('Share this cat (GitHub issue #27)', () => {
+  describe('Share this cat (GitHub issues #27, #34, #35)', () => {
     const shareCardData = {
       name: "Luna",
       breed: "Tabby",
@@ -175,126 +175,272 @@ describe('newtab.js DOM manipulation', () => {
       imageUrl: "https://cdn.rescuegroups.org/pic.jpg"
     };
 
-    it('does not render a share button when the platform has no Web Share API', () => {
+    function openShareMenu() {
+      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+      return document.querySelector('.share-menu');
+    }
+
+    function clickMenuItem(menu, label) {
+      const item = [...menu.querySelectorAll('.share-menu-item')].find(el => el.textContent === label);
+      assert.ok(item, `expected a "${label}" menu item`);
+      item.dispatchEvent(new window.Event('click'));
+      return item;
+    }
+
+    it('composes the message with the profile link ahead of the Tabby plug, both on their own blank-separated line (issue #35)', () => {
+      const message = window.buildShareMessage(shareCardData, shareCardData.profileUrl);
+      assert.equal(
+        message,
+        'Luna (Tabby, Adult, Female) is looking for a home at Happy Paws Rescue.\n\n' +
+        'https://rescuegroups.org/animals/luna\n\n' +
+        'Meet an adoptable cat every time you open a new tab. Get Tabby: https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig'
+      );
+    });
+
+    it('renders a "Share {name}" button even when the platform has no Web Share API (issue #34)', () => {
       delete window.navigator.share;
       window.renderCard(shareCardData);
-      assert.equal(document.querySelector('#card .share'), null);
-    });
-
-    it('renders a "Share {name}" button when navigator.share is available', () => {
-      window.navigator.share = async () => {};
-      window.renderCard(shareCardData);
       const shareButton = document.querySelector('#card .share');
-      assert.ok(shareButton);
+      assert.ok(shareButton, 'explicit channels (WhatsApp, email, etc.) do not depend on the Web Share API');
       assert.equal(shareButton.textContent, 'Share Luna');
       assert.equal(shareButton.tagName, 'BUTTON');
+
+      const menu = openShareMenu();
+      const labels = [...menu.querySelectorAll('.share-menu-item')].map(el => el.textContent);
+      assert.ok(!labels.includes('More options…'), 'no native fallback item when navigator.share is unavailable');
+      assert.ok(labels.includes('WhatsApp'));
     });
 
-    it('shares the photo, text and profile link together when the platform supports file attachments', async () => {
-      window.navigator.canShare = () => true;
-      let sharedData;
-      window.navigator.share = async (data) => { sharedData = data; };
-      window.fetch = async (url) => {
-        assert.ok(url.includes('/api/photo-share?url='), 'must fetch through the CORS-safe photo-share proxy, not the CDN directly');
-        return { ok: true, blob: async () => new window.Blob(["fake-photo-bytes"], { type: "image/jpeg" }) };
-      };
-
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
-
-      assert.ok(sharedData, 'navigator.share should have been called');
-      assert.equal(sharedData.title, 'Meet Luna');
-      assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
-      assert.ok(sharedData.text.includes('Luna'));
-      assert.ok(sharedData.text.includes('Happy Paws Rescue'));
-      assert.ok(sharedData.text.includes('Meet an adoptable cat every time you open a new tab.'), 'must include the Tabby tagline');
-      assert.ok(sharedData.text.includes('chromewebstore.google.com'), 'must promote the Tabby listing');
-      assert.equal(sharedData.files.length, 1);
-      assert.ok(sharedData.files[0] instanceof window.File);
-      assert.equal(sharedData.files[0].type, 'image/jpeg');
-    });
-
-    it('promotes the Edge Add-ons listing instead of the Chrome Web Store when running in Edge', async () => {
-      Object.defineProperty(window.navigator, 'userAgent', {
-        value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
-        configurable: true
+    describe('Share menu (GitHub issue #34)', () => {
+      it('opens with every explicit channel plus a native fallback when navigator.share is available', () => {
+        window.navigator.share = async () => {};
+        window.renderCard(shareCardData);
+        const menu = openShareMenu();
+        assert.ok(menu, 'clicking the share button should open the menu');
+        const labels = [...menu.querySelectorAll('.share-menu-item')].map(el => el.textContent);
+        assert.deepEqual(labels, ['WhatsApp', 'Email', 'X / Twitter', 'Facebook', 'LinkedIn', 'Copy link', 'More options…']);
       });
-      window.navigator.canShare = () => true;
-      let sharedData;
-      window.navigator.share = async (data) => { sharedData = data; };
-      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
 
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
+      it('toggles closed when the share button is clicked again', () => {
+        window.navigator.share = async () => {};
+        window.renderCard(shareCardData);
+        openShareMenu();
+        assert.ok(document.querySelector('.share-menu'));
+        document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
+        assert.equal(document.querySelector('.share-menu'), null);
+      });
 
-      assert.ok(sharedData);
-      assert.ok(sharedData.text.includes('microsoftedge.microsoft.com/addons'), 'Edge users should get the Edge Add-ons link, not the CWS one');
-      assert.ok(!sharedData.text.includes('chromewebstore.google.com'), 'must not also include the Chrome Web Store link');
+      it('closes on an outside click', async () => {
+        window.navigator.share = async () => {};
+        window.renderCard(shareCardData);
+        openShareMenu();
+        // The outside-click listener is attached via a deferred setTimeout so
+        // the click that opened the menu doesn't immediately close it again.
+        await new Promise(r => setTimeout(r, 0));
+        document.dispatchEvent(new window.Event('click'));
+        assert.equal(document.querySelector('.share-menu'), null);
+      });
+
+      it('closes on Escape', () => {
+        window.navigator.share = async () => {};
+        window.renderCard(shareCardData);
+        openShareMenu();
+        document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+        assert.equal(document.querySelector('.share-menu'), null);
+      });
+
+      it('closes automatically when the card re-renders, so a stale menu never lingers', () => {
+        window.navigator.share = async () => {};
+        window.renderCard(shareCardData);
+        openShareMenu();
+        assert.ok(document.querySelector('.share-menu'));
+        window.renderCard({ ...shareCardData, name: 'Milo' });
+        assert.equal(document.querySelector('.share-menu'), null);
+      });
+
+      it('opens WhatsApp with the composed message', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'WhatsApp');
+
+        assert.ok(openedUrl.startsWith('https://wa.me/?text='));
+        const message = decodeURIComponent(openedUrl.split('text=')[1]);
+        assert.ok(message.includes('https://rescuegroups.org/animals/luna\n\n'), 'the profile link must sit on its own blank-separated line, ahead of the Tabby plug');
+      });
+
+      it('opens the mail client with a subject and the composed message as the body', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Email');
+
+        assert.ok(openedUrl.startsWith('mailto:?subject=Meet%20Luna&body='));
+        const body = decodeURIComponent(openedUrl.split('body=')[1]);
+        assert.ok(body.includes('https://rescuegroups.org/animals/luna'));
+        assert.ok(body.includes('Get Tabby:'));
+      });
+
+      it('opens an X/Twitter intent with the intro text and the profile url', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'X / Twitter');
+
+        assert.ok(openedUrl.startsWith('https://twitter.com/intent/tweet?'));
+        assert.ok(openedUrl.includes(`url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`));
+        assert.ok(decodeURIComponent(openedUrl).includes('Luna'));
+      });
+
+      it('opens the Facebook sharer with just the profile url -- Facebook builds its own card from that page\'s Open Graph tags', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Facebook');
+        assert.equal(openedUrl, `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`);
+      });
+
+      it('opens the LinkedIn sharer with just the profile url', () => {
+        let openedUrl;
+        window.open = (url) => { openedUrl = url; };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'LinkedIn');
+        assert.equal(openedUrl, `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`);
+      });
+
+      it('copies the composed message to the clipboard', async () => {
+        let clipboardText;
+        window.navigator.clipboard = { writeText: async (text) => { clipboardText = text; } };
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Copy link');
+        await new Promise(r => setTimeout(r, 10));
+
+        assert.ok(clipboardText.includes('https://rescuegroups.org/animals/luna'));
+        assert.ok(document.getElementById('notice').textContent.includes('Copied to clipboard'));
+      });
+
+      it('shows an error notice when copying fails', async () => {
+        window.navigator.clipboard = { writeText: async () => { throw new Error('denied'); } };
+        window.console.error = () => {};
+        window.renderCard(shareCardData);
+        clickMenuItem(openShareMenu(), 'Copy link');
+        await new Promise(r => setTimeout(r, 10));
+
+        assert.ok(document.getElementById('notice').textContent.includes('Unable to copy'));
+      });
     });
 
-    it('shares without a photo file when canShare rejects file attachments', async () => {
-      window.navigator.canShare = () => false;
-      let sharedData;
-      window.navigator.share = async (data) => { sharedData = data; };
-      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+    describe('"More options" -- native Web Share API (GitHub issue #27)', () => {
+      function activateNativeShare() {
+        clickMenuItem(openShareMenu(), 'More options…');
+      }
 
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
+      it('shares the photo, text and profile link together when the platform supports file attachments', async () => {
+        window.navigator.canShare = () => true;
+        let sharedData;
+        window.navigator.share = async (data) => { sharedData = data; };
+        window.fetch = async (url) => {
+          assert.ok(url.includes('/api/photo-share?url='), 'must fetch through the CORS-safe photo-share proxy, not the CDN directly');
+          return { ok: true, blob: async () => new window.Blob(["fake-photo-bytes"], { type: "image/jpeg" }) };
+        };
 
-      assert.ok(sharedData);
-      assert.equal(sharedData.files, undefined);
-      assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
-    });
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
 
-    it('shares without a photo file when the photo-share proxy fetch fails', async () => {
-      let sharedData;
-      window.navigator.canShare = () => true;
-      window.navigator.share = async (data) => { sharedData = data; };
-      window.fetch = async () => ({ ok: false });
-      window.console.error = () => {};
+        assert.ok(sharedData, 'navigator.share should have been called');
+        assert.equal(sharedData.title, 'Meet Luna');
+        assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
+        assert.ok(sharedData.text.includes('Luna'));
+        assert.ok(sharedData.text.includes('Happy Paws Rescue'));
+        assert.ok(sharedData.text.includes('Meet an adoptable cat every time you open a new tab.'), 'must include the Tabby tagline');
+        assert.ok(sharedData.text.includes('chromewebstore.google.com'), 'must promote the Tabby listing');
+        assert.equal(sharedData.files.length, 1);
+        assert.ok(sharedData.files[0] instanceof window.File);
+        assert.equal(sharedData.files[0].type, 'image/jpeg');
+      });
 
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
+      it('promotes the Edge Add-ons listing instead of the Chrome Web Store when running in Edge', async () => {
+        Object.defineProperty(window.navigator, 'userAgent', {
+          value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+          configurable: true
+        });
+        window.navigator.canShare = () => true;
+        let sharedData;
+        window.navigator.share = async (data) => { sharedData = data; };
+        window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
 
-      assert.ok(sharedData, 'a failed photo fetch should not block sharing the link and text');
-      assert.equal(sharedData.files, undefined);
-    });
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
 
-    it('treats the user cancelling the native share sheet as a no-op, not an error', async () => {
-      window.navigator.canShare = () => true;
-      window.navigator.share = async () => { const err = new Error('cancelled'); err.name = 'AbortError'; throw err; };
-      window.navigator.clipboard = { writeText: async () => { throw new Error('should not be called'); } };
-      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
-      const loggedErrors = [];
-      window.console.error = (...args) => { loggedErrors.push(args); };
+        assert.ok(sharedData);
+        assert.ok(sharedData.text.includes('microsoftedge.microsoft.com/addons'), 'Edge users should get the Edge Add-ons link, not the CWS one');
+        assert.ok(!sharedData.text.includes('chromewebstore.google.com'), 'must not also include the Chrome Web Store link');
+      });
 
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
+      it('shares without a photo file when canShare rejects file attachments', async () => {
+        window.navigator.canShare = () => false;
+        let sharedData;
+        window.navigator.share = async (data) => { sharedData = data; };
+        window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
 
-      assert.equal(loggedErrors.length, 0, 'a user-cancelled share should not be logged as an error');
-      assert.equal(document.getElementById('notice').textContent, '');
-    });
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
 
-    it('falls back to copying the details to the clipboard when navigator.share fails for a real reason', async () => {
-      window.navigator.canShare = () => true;
-      window.navigator.share = async () => { throw new Error('share failed'); };
-      let clipboardText;
-      window.navigator.clipboard = { writeText: async (text) => { clipboardText = text; } };
-      window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
-      window.console.error = () => {};
+        assert.ok(sharedData);
+        assert.equal(sharedData.files, undefined);
+        assert.equal(sharedData.url, 'https://rescuegroups.org/animals/luna');
+      });
 
-      window.renderCard(shareCardData);
-      document.querySelector('#card .share').dispatchEvent(new window.Event('click'));
-      await new Promise(r => setTimeout(r, 10));
+      it('shares without a photo file when the photo-share proxy fetch fails', async () => {
+        let sharedData;
+        window.navigator.canShare = () => true;
+        window.navigator.share = async (data) => { sharedData = data; };
+        window.fetch = async () => ({ ok: false });
+        window.console.error = () => {};
 
-      assert.ok(clipboardText.includes('Luna'));
-      assert.ok(clipboardText.includes('https://rescuegroups.org/animals/luna'));
-      assert.ok(document.getElementById('notice').textContent.includes('Copied to clipboard'));
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
+
+        assert.ok(sharedData, 'a failed photo fetch should not block sharing the link and text');
+        assert.equal(sharedData.files, undefined);
+      });
+
+      it('treats the user cancelling the native share sheet as a no-op, not an error', async () => {
+        window.navigator.canShare = () => true;
+        window.navigator.share = async () => { const err = new Error('cancelled'); err.name = 'AbortError'; throw err; };
+        window.navigator.clipboard = { writeText: async () => { throw new Error('should not be called'); } };
+        window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+        const loggedErrors = [];
+        window.console.error = (...args) => { loggedErrors.push(args); };
+
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
+
+        assert.equal(loggedErrors.length, 0, 'a user-cancelled share should not be logged as an error');
+        assert.equal(document.getElementById('notice').textContent, '');
+      });
+
+      it('falls back to copying the details to the clipboard when navigator.share fails for a real reason', async () => {
+        window.navigator.canShare = () => true;
+        window.navigator.share = async () => { throw new Error('share failed'); };
+        let clipboardText;
+        window.navigator.clipboard = { writeText: async (text) => { clipboardText = text; } };
+        window.fetch = async () => ({ ok: true, blob: async () => new window.Blob(["x"], { type: "image/jpeg" }) });
+        window.console.error = () => {};
+
+        window.renderCard(shareCardData);
+        activateNativeShare();
+        await new Promise(r => setTimeout(r, 10));
+
+        assert.ok(clipboardText.includes('Luna'));
+        assert.ok(clipboardText.includes('https://rescuegroups.org/animals/luna'));
+        assert.ok(document.getElementById('notice').textContent.includes('Copied to clipboard'));
+      });
     });
   });
   describe('showNotice error vs. informational tone', () => {
