@@ -313,10 +313,10 @@ describe('newtab.js DOM manipulation', () => {
         assert.ok(message.includes('https://rescuegroups.org/animals/luna\n\n'), 'the profile link must sit on its own blank-separated line, ahead of the Tabby plug');
       });
 
-      it('opens the mail client via a real anchor click (window.open silently fails for mailto: in Chrome) with a subject and the composed message as the body', () => {
-        let clickedHref;
+      it('opens the mail client via a real, new-tab anchor click (window.open silently fails for mailto: in Chrome) with a subject and the composed message as the body', () => {
+        let clickedHref, clickedTarget, clickedRel;
         const originalClick = window.HTMLAnchorElement.prototype.click;
-        window.HTMLAnchorElement.prototype.click = function () { clickedHref = this.href; };
+        window.HTMLAnchorElement.prototype.click = function () { clickedHref = this.href; clickedTarget = this.target; clickedRel = this.rel; };
         try {
           window.renderCard(shareCardData);
           clickMenuItem(openShareMenu(), 'Email');
@@ -325,6 +325,8 @@ describe('newtab.js DOM manipulation', () => {
         }
 
         assert.ok(clickedHref.startsWith('mailto:?subject=Meet%20Luna&body='));
+        assert.equal(clickedTarget, '_blank');
+        assert.equal(clickedRel, 'noreferrer');
         const body = decodeURIComponent(clickedHref.split('body=')[1]);
         assert.ok(body.includes('https://rescuegroups.org/animals/luna'));
         assert.ok(body.includes('Get Tabby:'));
