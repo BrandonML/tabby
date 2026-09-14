@@ -70,6 +70,7 @@ export function run(argv, rootDir = ROOT) {
   const manifestPath = path.join(rootDir, "manifest.json");
   const packagePath = path.join(rootDir, "package.json");
   const extensionDir = path.join(rootDir, "extension");
+  const faviconPath = path.join(rootDir, "favicon.ico");
   const distDir = path.join(rootDir, "dist");
 
   writeJsonVersion(manifestPath, version);
@@ -86,6 +87,7 @@ export function run(argv, rootDir = ROOT) {
   const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "tabby-release-"));
   try {
     fs.copyFileSync(manifestPath, path.join(stagingDir, "manifest.json"));
+    fs.copyFileSync(faviconPath, path.join(stagingDir, "favicon.ico"));
     fs.cpSync(extensionDir, path.join(stagingDir, "extension"), { recursive: true });
     writeBackendUrl(path.join(stagingDir, "extension", "config.js"), backendUrl);
 

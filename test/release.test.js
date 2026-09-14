@@ -38,7 +38,7 @@ describe("release script", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tabby-release-test-"));
-    for (const name of ["manifest.json", "package.json", "extension", "server", "test", "package-lock.json"]) {
+    for (const name of ["manifest.json", "package.json", "extension", "server", "test", "package-lock.json", "favicon.ico"]) {
       const src = path.join(REPO_ROOT, name);
       if (fs.existsSync(src)) {
         fs.cpSync(src, path.join(tmpDir, name), { recursive: true });
@@ -96,6 +96,7 @@ describe("release script", () => {
 
     const entries = listZipEntries(fs.readFileSync(zipPath));
     assert.ok(entries.includes("manifest.json"));
+    assert.ok(entries.includes("favicon.ico"), "favicon.ico must ship at the package root -- that's where a browser's implicit /favicon.ico probe looks (issue #33)");
     assert.ok(entries.some((name) => name.startsWith("extension/")));
 
     for (const name of entries) {

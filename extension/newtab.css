@@ -167,6 +167,30 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 }
 .share:hover { background: var(--moss); color: var(--paper); }
 
+.share-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--paper);
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(42, 38, 32, .18);
+}
+.share-menu-item {
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 6px;
+}
+.share-menu-item:hover { background: var(--wall); }
+
 @media (max-width: 360px) {
   .photo { width: calc(100% - 32px); margin: 16px 16px 0; }
   .content { padding: 14px 16px 18px; }
