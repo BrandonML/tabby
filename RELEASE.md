@@ -1,6 +1,6 @@
 # Release runbook
 
-Steps to ship a change from `dev` to `main`, which auto-deploys the server to Northflank, and on to the Chrome Web Store / Edge Add-ons.
+Steps to ship a change to `main`, which auto-deploys the server to Northflank, and on to the Chrome Web Store / Edge Add-ons.
 
 ## 1. One-time setup (only needs doing once, ever)
 
@@ -8,7 +8,8 @@ Steps to ship a change from `dev` to `main`, which auto-deploys the server to No
 
 ## 2. Pre-merge
 
-- [ ] Open a pull request from `dev` into `main` — don't merge locally and push. Going through a PR is what lets the ruleset above actually gate the merge on CI passing (a direct push of an untested commit is rejected outright, since it can never satisfy the required check).
+- [ ] Default: open a pull request straight from the feature branch into `main` — don't merge locally and push. Going through a PR is what lets the ruleset above actually gate the merge on CI passing (a direct push of an untested commit is rejected outright, since it can never satisfy the required check). The ruleset gates on the *target* branch (`main`) requiring a PR + a green `test` check — it doesn't care what the source branch is named, so there's no need to create a `dev` branch just to have one.
+- [ ] Exception: if several feature branches are ready to ship together, merge them all into a shared `dev` branch first, then open one PR from `dev` into `main`. Use this only when bundling multiple branches — a single feature branch goes straight to `main`.
 - [ ] Wait for the `test` check to go green. If it's red, stop — do not merge.
 - [ ] Merge the PR.
 
