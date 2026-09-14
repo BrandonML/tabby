@@ -349,15 +349,19 @@ describe('newtab.js DOM manipulation', () => {
         assert.equal(openedUrl, `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`);
       });
 
-      it('opens the Reddit submit intent with a title and the profile url -- Reddit, unlike Facebook, accepts the title directly', () => {
+      it('opens Reddit as a self/text post with a title and the composed message as the body -- a link post has no body field and its thumbnail depends on the rescue site\'s own Open Graph tags, same as Facebook', () => {
         let openedUrl;
         window.open = (url) => { openedUrl = url; };
         window.renderCard(shareCardData);
         clickMenuItem(openShareMenu(), 'Reddit');
-        assert.equal(openedUrl, `https://www.reddit.com/submit?url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}&title=${encodeURIComponent('Meet Luna')}`);
+
+        assert.ok(openedUrl.startsWith('https://www.reddit.com/submit?title=Meet%20Luna&text='));
+        const body = decodeURIComponent(openedUrl.split('text=')[1]);
+        assert.ok(body.includes('https://rescuegroups.org/animals/luna'));
+        assert.ok(body.includes('Get Tabby:'));
       });
 
-      it('opens the Pinterest pin intent with the photo-share proxy image and a description -- unaffected by the rescue site\'s own Open Graph tags', () => {
+      it('opens the Pinterest pin intent with a description and the photo-share proxy image, when the backend is a real https url', () => {
         let openedUrl;
         window.open = (url) => { openedUrl = url; };
         window.renderCard(shareCardData);
@@ -365,9 +369,14 @@ describe('newtab.js DOM manipulation', () => {
 
         assert.ok(openedUrl.startsWith('https://www.pinterest.com/pin/create/button/?'));
         assert.ok(openedUrl.includes(`url=${encodeURIComponent('https://rescuegroups.org/animals/luna')}`));
-        const mediaParam = decodeURIComponent(openedUrl.match(/media=([^&]+)/)[1]);
-        assert.ok(mediaParam.includes('/api/photo-share?url='), 'must use the CORS-safe photo-share proxy, not the CDN directly');
         assert.ok(decodeURIComponent(openedUrl).includes('Luna'));
+        // This suite's config.js BACKEND_URL is the real dev value,
+        // http://localhost:8787 (see scripts/release.js) -- not https, so
+        // `media` is correctly omitted here. The included-branch is exactly
+        // symmetric (see the guard in newtab.js) and was verified against a
+        // real https backend in a real browser rather than duplicated here.
+        assert.ok(!openedUrl.includes('media='), 'a non-https backend (local dev) must not send media -- Pinterest fetches it server-side and can\'t reach localhost, which previously surfaced as an error in Pinterest\'s own dialog');
+        assert.ok(openedUrl.includes('description='), 'the pin should still work without a forced image');
       });
 
       it('opens the Nextdoor share plugin with the composed message as the body', () => {

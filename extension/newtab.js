@@ -445,11 +445,17 @@ function openShareTarget(url) {
 // window.open('mailto:...') is unreliable in Chrome -- it silently does
 // nothing in a lot of real-world configurations. A real anchor click is what
 // browsers actually special-case for handing a non-http(s) scheme off to the
-// OS/registered app without navigating this page.
+// OS/registered app without navigating this page. Briefly attaching it to
+// the document (rather than clicking it detached) matches how every other
+// "trigger a mailto/download via a synthetic click" implementation does it --
+// some engines only give an element real activation/navigation behavior once
+// it's actually connected.
 function openMailto(url) {
   const link = document.createElement("a");
   link.href = url;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
 }
 
 async function copyShareLink(card, shareUrl) {
@@ -467,24 +473,36 @@ function sharePhotoUrl(card) {
   return `${backendUrl}/api/photo-share?url=${encodeURIComponent(card.imageUrl)}`;
 }
 
-// Facebook only ever takes a URL -- it builds its own preview card by
-// scraping that page's Open Graph tags, not from anything Tabby sends, and
-// most rescues' RescueGroups-hosted pages don't have (correct) OG tags, so
-// this one channel is stuck showing generic/missing content until the
-// cat-details share page (tracked separately) replaces the raw profile link.
-// Reddit and Pinterest sidestep that entirely -- their intents accept the
-// title/image/description directly as params, so they show real cat details
-// regardless of the rescue's own site. Text-composer channels (WhatsApp,
-// email, Nextdoor, copy) get the fully composed message so their
-// content/ordering is exact (issue #35), not left to how a native share
-// target happens to join separate text/url fields back together.
+// Facebook and X only ever take a URL/text -- any card image comes from that
+// page's own Open Graph/Twitter Card tags (X has no media param at all --
+// there's no fix for that one short of Twitter adding it), and most rescues'
+// RescueGroups-hosted pages don't have (correct) OG tags, so these two are
+// stuck showing generic/missing content until the cat-details share page
+// (tracked separately) replaces the raw profile link. Pinterest sidesteps
+// that -- its intent takes the photo directly via `media`, guarded below to
+// a real https URL (Pinterest fetches it server-side, so a local dev
+// backend can't be reached and previously surfaced as a confusing error in
+// Pinterest's own dialog instead of degrading gracefully). Reddit's
+// link-post mode has the same OG-thumbnail problem *and* no body field at
+// all, so it's submitted as a self/text post instead, like the
+// text-composer channels below (WhatsApp, email, Nextdoor, copy) -- all get
+// the fully composed message so their content/ordering is exact (issue
+// #35), not left to how a native share target happens to join separate
+// text/url fields back together.
 const SHARE_CHANNELS = [
   { label: "WhatsApp", activate: (card, shareUrl) => openShareTarget(`https://wa.me/?text=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
   { label: "Email", activate: (card, shareUrl) => openMailto(`mailto:?subject=${encodeURIComponent(`Meet ${card.name}`)}&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
   { label: "X / Twitter", activate: (card, shareUrl) => openShareTarget(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildShareIntro(card))}&url=${encodeURIComponent(shareUrl)}`) },
   { label: "Facebook", activate: (_card, shareUrl) => openShareTarget(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`) },
-  { label: "Reddit", activate: (card, shareUrl) => openShareTarget(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(`Meet ${card.name}`)}`) },
-  { label: "Pinterest", activate: (card, shareUrl) => openShareTarget(`https://www.pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}&media=${encodeURIComponent(sharePhotoUrl(card))}&description=${encodeURIComponent(buildShareIntro(card))}`) },
+  { label: "Reddit", activate: (card, shareUrl) => openShareTarget(`https://www.reddit.com/submit?title=${encodeURIComponent(`Meet ${card.name}`)}&text=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
+  {
+    label: "Pinterest",
+    activate: (card, shareUrl) => {
+      const photoUrl = sharePhotoUrl(card);
+      const mediaParam = photoUrl.startsWith("https://") ? `&media=${encodeURIComponent(photoUrl)}` : "";
+      openShareTarget(`https://www.pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}${mediaParam}&description=${encodeURIComponent(buildShareIntro(card))}`);
+    }
+  },
   { label: "Nextdoor", activate: (card, shareUrl) => openShareTarget(`https://nextdoor.com/sharekit/?source=tabby&body=${encodeURIComponent(buildShareMessage(card, shareUrl))}`) },
   { label: "Copy link", activate: (card, shareUrl) => copyShareLink(card, shareUrl) }
 ];
