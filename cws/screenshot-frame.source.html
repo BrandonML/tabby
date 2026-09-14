@@ -48,6 +48,13 @@
        ?scene=fee-tags&scale=1.3
        (lower scale so the status chips + fee, which sit below the name/
        meta this scene doesn't otherwise need, are in frame)
+     screenshot-6-share.png:
+       ?scene=share&scale=1.3&shiftY=-140
+       (auto-clicks the Share button 200ms after load; shifted down enough
+       to bring the actions row into frame -- the menu itself renders into
+       document.body, not .stage, so it isn't scaled by --scale, but it
+       still self-positions correctly since positionShareMenu() reads the
+       button's real post-transform rect)
 
      screenshot-4-settings.png comes from the companion
      screenshot-frame-options.source.html (no query params needed -- the
@@ -187,6 +194,12 @@
   if (scene === 'explore') {
     window.addEventListener('load', () => {
       setTimeout(() => document.getElementById('explore').click(), 200);
+    });
+  }
+
+  if (scene === 'share') {
+    window.addEventListener('load', () => {
+      setTimeout(() => document.querySelector('#card .share')?.click(), 200);
     });
   }
 

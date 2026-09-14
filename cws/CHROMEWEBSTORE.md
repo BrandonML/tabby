@@ -88,6 +88,7 @@ English
 | Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready | `screenshot-3-first-run.png` |
 | Screenshot 4 | 1280×800 | ✅ Ready | `screenshot-4-settings.png` |
 | Screenshot 5 | 1280×800 | ✅ Ready | `screenshot-5-fee-tags.png` |
+| Screenshot 6 | 1280×800 | ✅ Ready | `screenshot-6-share.png` |
 | Small Promo Tile [RECOMMENDED] | 440×280 | ✅ Ready | `small-promo-tile.png` |
 | Marquee Promo Tile | 1400×560 | ✅ Ready | `marquee-promo-tile.png` |
 
@@ -99,6 +100,7 @@ English
 3. **First run** — the "Find cats near you" panel (Use my location / enter ZIP), so users see how onboarding works before installing.
 4. **Settings** — the redesigned settings page (stacked "Use my location" / ZIP layout from the recent redesign).
 5. **Status chips & fee** — a card showing the "Adoption pending" / "Special needs" chips and a normalized adoption fee, to demonstrate the extension surfaces real, practical adoption details.
+6. **Share menu** — the "Share via" popover open on a card, showing the explicit channel list (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) added in v2.1.0.
 
 All screenshots use the real `extension/newtab.css`/`newtab.js`/`options.js` unmodified — layout, CSS, and copy are all pixel-real, not a mockup — with realistic sample data standing in for a live RescueGroups response (an automated capture can't depend on a real user's location or the live API's current inventory). Per GitHub issue #28, the original captures showed the real 620px-wide card centered on a 1280×800 canvas with huge empty margins (close to half the image blank), since `.shell`'s max-width is fixed regardless of viewport. Recaptured via `screenshot-frame.source.html` / `screenshot-frame-options.source.html` (see those files for the exact per-screenshot URLs), which scale the rendered card up to ~75–90% of the canvas width without touching the real responsive layout at all. The card's own aspect ratio is close to square, so filling 80%+ of a wide 1280×800 canvas by width while keeping every line of text on-screen isn't simultaneously achievable — screenshots 1 and 5 trade a bit of width (down to ~63–75%) to keep their relevant text (name / status chips & fee) uncropped, rather than hit 80% at the cost of visibly truncated text; screenshots 2–4 reach ~75–90% width with nothing cropped.
 
@@ -188,6 +190,7 @@ https://github.com/BrandonML/tabby
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
 | 0.1.0 | 2026-08-19 | Initial Chrome Web Store submission: location/ZIP search with radius escalation, explore-another-area, adoption fee display, redesigned card layout | Draft |
+| 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button | Submitted |
 
 
 ## Review Notes
