@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=Inter:wght@400;600;700&display=swap">
+<style>
+@font-face { font-family: "Fraunces"; src: url("extension/fonts/fraunces.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
+body { margin: 0; }
+a { color: #2c4230; }
+a:hover { color: #3f5d42; }
+</style>
+</helmet>
+
+<section style="padding:56px 48px 80px;background:#e7e4d6;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#2a2620;border-bottom:2px solid #cdbfa0">
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:40px">
+    <p style="margin:0;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b6154">Tabby · turn 2 · #30 settled on <a href="#30b">30b</a> · polish pass</p>
+    <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:34px;letter-spacing:-0.01em">Two more tagline ideas, and the four polish items</h1>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">Issue #25, take two — header row left exactly as it is</p>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:56px">
+
+    <div id="2a" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2a</span>
+        <span style="font-weight:700;font-size:15px">Inline with the wordmark — one row, alignment untouched</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">Your objection to 25a was that stacking broke the single-row header. This keeps the row: the tagline sits beside the wordmark behind a hairline rule, sharing its baseline, so Tabby / tagline / Explore / Settings all still align on one line. 14px Fraunces italic — up from 13px, and far more visible than in the footer because it's now adjacent to the brand.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#2a2620;margin:0">Tabby</p>
+              <span style="width:1px;height:13px;background:#cdbfa0;align-self:center"></span>
+              <p style="font-family:Fraunces,Georgia,serif;font-style:italic;font-size:14px;color:#6b6154;margin:0">One cat at a time.</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:180px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0.75rem 0 1.375rem"><a href="#2a" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#2a" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <footer style="margin-top:32px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#2a" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#2a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#2a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#2a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#2a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#2a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.html — &lt;div class="brand"&gt; wraps .wordmark, a &lt;span
+class="brand-rule"&gt;, and the moved &lt;p class="tagline"&gt;
+
+newtab.css
+  .brand      { display: flex; align-items: baseline; gap: 10px; }
+  .brand-rule { width: 1px; height: 13px; background: var(--card-edge);
+                align-self: center; }
+  .tagline    { font-family: var(--font-display); font-style: italic;
+                font-size: 14px; color: var(--ink-soft); margin: 0; }
+  .footer .tagline — delete rule
+
+  /* the header row is the only place this can crowd */
+  @media (max-width: 460px) {
+    .brand-rule, .tagline { display: none; }
+  }</div>
+    </div>
+
+    <div id="2b" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2b</span>
+        <span style="font-weight:700;font-size:15px">Below the card, at the page's own microcopy scale</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">25b's placement was right, its size was wrong. This uses the mono voice the page already speaks in — the same family as <code style="font-family:ui-monospace,monospace">.meta</code>, <code style="font-family:ui-monospace,monospace">.distance</code> and the nav buttons — at 12.5px with 0.16em tracking in <code style="font-family:ui-monospace,monospace">--moss-dark</code>. It's noticeable because of the space and the color, not the point size.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#2a2620;margin:0">Tabby</p>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:180px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0.75rem 0 1.375rem"><a href="#2b" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#2b" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12.5px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#2c4230;text-align:center;margin:24px 0 0">One cat at a time</p>
+          <footer style="margin-top:24px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#2b" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#2b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#2b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#2b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#2b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#2b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.html — move &lt;p class="tagline"&gt; to a sibling of &lt;footer&gt;,
+directly after #notice. Drop the period (it's set as a label now).
+
+newtab.css
+  .tagline { font-family: var(--font-mono); font-size: 12.5px;
+             font-weight: 600; letter-spacing: 0.16em;
+             text-transform: uppercase; color: var(--moss-dark);
+             text-align: center; margin: 24px 0 0; }
+  .footer  { margin-top: 24px; }   /* was 32px */
+  .footer .tagline — delete rule</div>
+    </div>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">1 · Body typeface — what replaces the un-loaded Inter</p>
+  <div id="2c" style="background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:26px 28px;margin-bottom:56px;max-width:1388px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+      <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2c</span>
+      <span style="font-weight:700;font-size:15px">Three ways to answer it — same card copy, same sizes, different body face</span>
+    </div>
+    <p style="margin:0 0 22px;font-size:13.5px;line-height:1.6;color:#6b6154;max-width:920px;text-wrap:pretty">Only Fraunces ships as a file today, and it's only used for the wordmark and the cat's name. Everything else — meta, distance, rescue, buttons, notices — is falling through to whatever <code style="font-family:ui-monospace,monospace">system-ui</code> resolves to. These three panels render identical markup so you can compare the actual difference.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+
+      <div style="flex:1 1 400px;min-width:0">
+        <p style="margin:0 0 10px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b6154">Option 1 — drop Inter, keep the system stack</p>
+        <div style="background:#e4e1d3;border:1px solid #cdbfa0;border-radius:12px;padding:20px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif">
+          <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+          <p style="font-size:0.8125rem;color:#2a2620;margin:0.75rem 0 0.5rem">Whisker Haven Rescue is looking for a foster home for this two-year-old shorthair.</p>
+          <p style="font-size:0.95rem;font-weight:600;color:#2c4230;margin:0 0 14px">View profile · Share Marbles</p>
+          <p style="margin:0;font-size:12px;color:#6b6154">Built by Brandon</p>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#2a2620"><strong>0 KB.</strong> Segoe UI on Windows, SF on Mac — both already optimised for the OS's own rendering, and both perfectly neutral against Fraunces. Nothing to self-host, nothing to subset, no flash of fallback text on a page that must paint instantly.</p>
+      </div>
+
+      <div style="flex:1 1 400px;min-width:0">
+        <p style="margin:0 0 10px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b6154">Option 2 — actually ship Inter</p>
+        <div style="background:#e4e1d3;border:1px solid #cdbfa0;border-radius:12px;padding:20px;font-family:Inter,ui-sans-serif,system-ui,sans-serif">
+          <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+          <p style="font-size:0.8125rem;color:#2a2620;margin:0.75rem 0 0.5rem">Whisker Haven Rescue is looking for a foster home for this two-year-old shorthair.</p>
+          <p style="font-size:0.95rem;font-weight:600;color:#2c4230;margin:0 0 14px">View profile · Share Marbles</p>
+          <p style="margin:0;font-size:12px;color:#6b6154">Built by Brandon</p>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#2a2620"><strong>~28 KB subset, and I'd skip it.</strong> Inter is the default look of every SaaS dashboard of the last five years — it's tight, cold, and it actively fights the warm paper-and-stamp world Fraunces sets up. Compare it to the panel on the left: you're paying a font download to look more generic.</p>
+      </div>
+
+      <div style="flex:1 1 400px;min-width:0">
+        <p style="margin:0 0 10px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b6154">Option 3 — self-host Public Sans</p>
+        <div style="background:#e4e1d3;border:1px solid #cdbfa0;border-radius:12px;padding:20px;font-family:'Public Sans',ui-sans-serif,system-ui,sans-serif">
+          <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+          <p style="font-size:0.8125rem;color:#2a2620;margin:0.75rem 0 0.5rem">Whisker Haven Rescue is looking for a foster home for this two-year-old shorthair.</p>
+          <p style="font-size:0.95rem;font-weight:600;color:#2c4230;margin:0 0 14px">View profile · Share Marbles</p>
+          <p style="margin:0;font-size:12px;color:#6b6154">Built by Brandon</p>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#2a2620"><strong>~22 KB subset.</strong> Slightly wider, warmer, more open apertures than Inter — it holds its own next to Fraunces instead of shrinking away from it. This is the one to pick <em>if</em> you want the extension to look identical on every machine. Must be self-hosted next to <code style="font-family:ui-monospace,monospace">fraunces.woff2</code>; the extension CSP won't load a Google Fonts URL.</p>
+      </div>
+    </div>
+    <div style="margin-top:22px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">My recommendation: option 1. One line, no new bytes on a page that
+loads on every single new tab, and it makes the CSS honest about what
+actually renders.
+
+newtab.css
+  :root { font-family: ui-sans-serif, system-ui, -apple-system,
+                       "Segoe UI", sans-serif; }
+
+If you'd rather have identical rendering everywhere, option 3 —
+subset Public Sans to latin + the weights in use (400/600/700),
+drop the woff2 in extension/fonts/, add an @font-face beside the
+Fraunces one, and put "Public Sans" at the front of the stack.</div>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">2 + 4 · Focus rings and transitions — live, hover and tab through these</p>
+  <div id="2d" style="background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:26px 28px;margin-bottom:56px;max-width:1388px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+      <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2d</span>
+      <span style="font-weight:700;font-size:15px">Interaction bench — every control type in the extension, before and after</span>
+    </div>
+    <p style="margin:0 0 22px;font-size:13.5px;line-height:1.6;color:#6b6154;max-width:920px;text-wrap:pretty">Hover each row to feel the difference, and press Tab to walk the focus ring through them. Left column is today's behaviour; right column adds <code style="font-family:ui-monospace,monospace">transition</code> and a moss focus ring. Two rules, no markup change.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+
+      <div style="flex:1 1 420px;min-width:0;background:#e4e1d3;border:1px solid #cdbfa0;border-radius:12px;padding:22px">
+        <p style="margin:0 0 18px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b6154">Today — instant snap, browser-default ring</p>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start">
+          <button type="button" style="border:0;border-radius:8px;padding:12px 16px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-size:0.95rem;font-weight:600;cursor:pointer" style-hover="background:#2c4230">Use my location</button>
+          <button type="button" style="background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:#3f5d42;color:#f6efdd">Share Marbles</button>
+          <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer" style-hover="text-decoration:underline">Settings</button>
+          <a href="#2d" style="font-size:0.8125rem;color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a>
+          <div style="width:100%;background:#f6efdd;border:1px solid #cdbfa0;border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:2px">
+            <button type="button" style="background:transparent;border:0;color:#2a2620;font-family:inherit;font-weight:600;font-size:0.875rem;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer" style-hover="background:#e4e1d3">WhatsApp</button>
+            <button type="button" style="background:transparent;border:0;color:#2a2620;font-family:inherit;font-weight:600;font-size:0.875rem;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer" style-hover="background:#e4e1d3">Copy link</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1 1 420px;min-width:0;background:#e4e1d3;border:1px solid #cdbfa0;border-radius:12px;padding:22px">
+        <p style="margin:0 0 18px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#2c4230">Proposed — 120ms ease, moss focus ring</p>
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start">
+          <button type="button" style="border:0;border-radius:8px;padding:12px 16px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-size:0.95rem;font-weight:600;cursor:pointer;outline:none;transition:background-color .12s ease,color .12s ease,box-shadow .12s ease" style-hover="background:#2c4230" style-focus="box-shadow:0 0 0 2px #e4e1d3,0 0 0 4px #3f5d42">Use my location</button>
+          <button type="button" style="background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer;outline:none;transition:background-color .12s ease,color .12s ease,box-shadow .12s ease" style-hover="background:#3f5d42;color:#f6efdd" style-focus="box-shadow:0 0 0 2px #e4e1d3,0 0 0 4px #3f5d42">Share Marbles</button>
+          <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer;outline:none;transition:color .12s ease,box-shadow .12s ease" style-hover="text-decoration:underline;color:#3f5d42" style-focus="box-shadow:0 0 0 2px #e4e1d3,0 0 0 4px #3f5d42">Settings</button>
+          <a href="#2d" style="font-size:0.8125rem;color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px;border-radius:3px;outline:none;transition:color .12s ease,box-shadow .12s ease" style-hover="color:#3f5d42" style-focus="box-shadow:0 0 0 2px #e4e1d3,0 0 0 4px #3f5d42">Whisker Haven Rescue</a>
+          <div style="width:100%;background:#f6efdd;border:1px solid #cdbfa0;border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:2px">
+            <button type="button" style="background:transparent;border:0;color:#2a2620;font-family:inherit;font-weight:600;font-size:0.875rem;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer;outline:none;transition:background-color .12s ease,box-shadow .12s ease" style-hover="background:#e4e1d3" style-focus="background:#e4e1d3;box-shadow:inset 0 0 0 2px #3f5d42">WhatsApp</button>
+            <button type="button" style="background:transparent;border:0;color:#2a2620;font-family:inherit;font-weight:600;font-size:0.875rem;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer;outline:none;transition:background-color .12s ease,box-shadow .12s ease" style-hover="background:#e4e1d3" style-focus="background:#e4e1d3;box-shadow:inset 0 0 0 2px #3f5d42">Copy link</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:22px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.css — no markup changes at all
+
+  /* 4 · transitions */
+  button, .profile, a {
+    transition: background-color .12s ease, color .12s ease,
+                box-shadow .12s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button, .profile, a { transition: none; }
+  }
+
+  /* 2 · focus rings. outline-offset can't follow the rounded
+     corners cleanly on .share-menu-item inside its padded
+     container, so that one uses an inset ring instead. */
+  :focus-visible {
+    outline: 2px solid var(--moss);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  .share-menu-item:focus-visible {
+    outline: none;
+    background: var(--wall);
+    box-shadow: inset 0 0 0 2px var(--moss);
+  }</div>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">3 · Dark mode — same eight custom properties, redefined</p>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:56px">
+    <div id="2e" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2e</span>
+        <span style="font-weight:700;font-size:15px">Dark mode — zero markup change</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">Paper and wall become two near-black browns rather than grey, so the card still reads as a warm object on a wall. Moss splits: the fill stays a deep green, but the <em>text</em> moss lightens — a dark-on-dark link would fail contrast otherwise. The pin-hole dot and photo border keep working because they already reference the tokens.</p>
+      <div style="background:#1b1915;padding:26px;border-radius:12px;border:1px solid #3c362a">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#efe8d7;margin:0">Tabby</p>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#93b896;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#93b896;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#24211a;border:1px solid #3c362a;box-shadow:0 1px 0 rgba(0,0,0,.25)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#1b1915;box-shadow:inset 0 1px 2px rgba(0,0,0,.6);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:200px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#1b1915 0 10px,#211e17 10px 20px);border:1px solid #3c362a;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#a69c88">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#efe8d7">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#a69c88;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin:2px 0 14px">
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#e08b78;transform:rotate(-2deg)">Adoption pending</span>
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#93b896;transform:rotate(1.5deg)">Special needs</span>
+              </div>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#a69c88;margin:-0.375rem 0 0.875rem">$125 adoption fee</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#93b896;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.75rem;color:#a69c88;margin:0 0 1rem">Updated Today</p>
+              <p style="font-size:0.8125rem;color:#efe8d7;margin:0 0 1.375rem"><a href="#2e" style="color:#93b896;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#2e" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#4f7253;color:#efe8d7;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#93b896;border:1.5px solid #4f7253;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <footer style="margin-top:32px;padding-top:18px;border-top:1px solid #3c362a;text-align:center">
+            <p style="font-family:Fraunces,Georgia,serif;font-style:italic;font-size:13px;color:#a69c88;margin:0 0 8px">One cat at a time.</p>
+            <p style="font-size:12px;color:#a69c88;margin:0 0 6px">Built by <a href="#2e" style="color:#efe8d7;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#a69c88;margin:0">
+              <a href="#2e" style="color:#93b896;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#3c362a">·</span>
+              <a href="#2e" style="color:#93b896;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#3c362a">·</span>
+              <a href="#2e" style="color:#93b896;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#3c362a">·</span>
+              <a href="#2e" style="color:#93b896;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#3c362a">·</span>
+              <a href="#2e" style="color:#93b896;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.css
+
+  :root { color-scheme: light dark; }   /* was: light */
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      background: #1b1915;
+      color: #efe8d7;
+      --paper:     #24211a;
+      --wall:      #1b1915;
+      --ink:       #efe8d7;
+      --ink-soft:  #a69c88;
+      --moss:      #4f7253;   /* fills */
+      --moss-dark: #93b896;   /* text/links — inverted role */
+      --stamp:     #e08b78;
+      --card-edge: #3c362a;
+    }
+    .card { box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+    .card::before { box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+    button:hover, .profile:hover { background: #5d845f; }
+  }
+
+Note the --moss-dark role flip: in light mode it's the *darker*
+green used for text, in dark mode it has to be the *lighter* one.
+Everything that already uses the token comes along for free.</div>
+    </div>
+
+    <div id="2f" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:26px 28px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">2f</span>
+        <span style="font-weight:700;font-size:15px">5 · Shell margin — issue text to paste</span>
+      </div>
+      <p style="margin:0 0 16px;font-size:13.5px;line-height:1.6;color:#6b6154;text-wrap:pretty">The connector is read-only on this repo, so I couldn't file it directly. Everything below is ready to paste into a new issue — suggested title first, then the body. Label: <strong>design</strong>.</p>
+      <div style="background:#2a2620;color:#f6efdd;border-radius:8px;padding:16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.75;white-space:pre-wrap">Title:
+Make .shell top/bottom margin responsive (clamp) so the footer
+isn't pushed off-screen on short viewports
+
+Body:
+## Problem
+
+`.shell` uses a fixed `margin: 8vh auto` (extension/newtab.css).
+On short viewports this reserves 8% of the height at the top *and*
+bottom regardless of how tall the card actually is. Combined with a
+tall portrait photo (`.photo-portrait` is `height: min(65vh, 560px)`),
+the card plus the 32px-margin footer can push the footer below the
+fold on a typical laptop — so the credit/links row is only reachable
+by scrolling a page that is otherwise meant to be seen at a glance.
+
+On large displays the 8vh is doing real work; it's what gives the new
+tab its calm, unhurried feel. So the fix is not simply to reduce it.
+
+## Suggested change
+
+```css
+.shell { margin: clamp(24px, 8vh, 96px) auto; }
+```
+
+Keeps the current proportional spacing where it looks good, floors it
+at 24px so short viewports don't lose the top eighth, and caps it at
+96px so very tall displays don't push the card uncomfortably far down.
+
+## Testing notes
+
+Needs real measurement rather than eyeballing. Please check before and
+after at:
+
+- 1280x720 and 1366x768 with a **tall portrait** photo (the
+  `.photo-portrait` tier, ratio &gt; 1.35) and every optional card row
+  present — chips, adoption fee, distance, updated, rescue link, and
+  both card actions. That's the worst case for total card height.
+- The same viewports with a normal landscape photo, to confirm the
+  layout doesn't now read as top-heavy.
+- A tall display (e.g. a 1440x2560 portrait monitor) to confirm the
+  96px cap still feels generous rather than cramped.
+- The first-run state (`#location-panel` visible, no card) and the
+  no-results notice state. Both are much shorter than a card, and
+  they're where a too-small top margin would show first.
+
+Ideal outcome: at 1280x720 with a tall portrait card, the footer is
+visible without scrolling — or at minimum measurably closer to the
+fold than today.
+
+The clamp() values are a starting point, not a conclusion. Adjust
+based on what the measurements actually show.</div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 48px 96px;background:#eceadf;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#2a2620">
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:40px">
+    <p style="margin:0;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b6154">Tabby · turn 1 · mockups from extension/newtab.html + newtab.css @ main</p>
+    <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:34px;letter-spacing:-0.01em">Issue #25 tagline placement &amp; issue #30 settings polish</h1>
+    <p style="margin:0;max-width:820px;color:#6b6154;font-size:14px;line-height:1.6;text-wrap:pretty">Every mock below is the real markup and the real CSS values from the repo, with sample card data standing in for a live API response. Each option carries the exact CSS delta to apply.</p>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">Issue #25 — reposition the tagline</p>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:56px">
+
+    <div id="25base" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #6b6154;color:#6b6154;border-radius:3px;padding:2px 7px">today</span>
+        <span style="font-weight:700;font-size:15px">Current — tagline inside the footer stack</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">13px italic, <code style="font-family:ui-monospace,monospace">--ink-soft</code>, sitting above the credit line and the five social links. It reads as the first row of a link list, not as a statement.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#2a2620;margin:0">Tabby</p>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:210px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin:2px 0 14px">
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#b23a2e;transform:rotate(-2deg)">Adoption pending</span>
+              </div>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:-0.375rem 0 0.875rem">$125 adoption fee</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.75rem;color:#6b6154;margin:0 0 1rem">Updated Today</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0 0 1.375rem"><a href="#25base" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#25base" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <footer style="margin-top:32px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-family:Fraunces,Georgia,serif;font-style:italic;font-size:13px;color:#6b6154;margin:0 0 8px">One cat at a time.</p>
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#25base" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#25base" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#25base" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#25base" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#25base" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#25base" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <div id="25a" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">25a</span>
+        <span style="font-weight:700;font-size:15px">Masthead lockup — tagline under the wordmark</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">Smallest change with the biggest read: the tagline becomes the wordmark's subtitle at the top of the page, where the eye lands first. 15px Fraunces italic. Footer keeps credit + links.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px">
+            <div>
+              <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#2a2620;margin:0">Tabby</p>
+              <p style="font-family:Fraunces,Georgia,serif;font-style:italic;font-size:15px;color:#6b6154;margin:3px 0 0">One cat at a time.</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:210px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin:2px 0 14px">
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#b23a2e;transform:rotate(-2deg)">Adoption pending</span>
+              </div>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:-0.375rem 0 0.875rem">$125 adoption fee</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.75rem;color:#6b6154;margin:0 0 1rem">Updated Today</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0 0 1.375rem"><a href="#25a" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#25a" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <footer style="margin-top:32px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#25a" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#25a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#25a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#25a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#25a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#25a" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.html — move &lt;p class="tagline"&gt; out of &lt;footer&gt;, wrap the
+wordmark: &lt;div class="brand"&gt;&lt;p class="wordmark"&gt;…&lt;p class="tagline"&gt;
+
+newtab.css
+  header      { align-items: flex-start; margin-bottom: 18px; }
+  .tagline    { font-family: var(--font-display); font-style: italic;
+                font-size: 15px; color: var(--ink-soft); margin: 3px 0 0; }
+  .footer .tagline — delete rule</div>
+    </div>
+
+    <div id="25b" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">25b</span>
+        <span style="font-weight:700;font-size:15px">Closing line — tagline below the card, above the footer rule</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">20px Fraunces italic in <code style="font-family:ui-monospace,monospace">--moss-dark</code>, on its own with air around it. Reads as the sign-off after meeting the cat rather than as chrome. Strongest emotional beat; costs one extra scroll-length of page.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:0.95rem;letter-spacing:0.01em;color:#2a2620;margin:0">Tabby</p>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:210px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin:2px 0 14px">
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#b23a2e;transform:rotate(-2deg)">Adoption pending</span>
+              </div>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:-0.375rem 0 0.875rem">$125 adoption fee</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.75rem;color:#6b6154;margin:0 0 1rem">Updated Today</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0 0 1.375rem"><a href="#25b" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#25b" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <p style="font-family:Fraunces,Georgia,serif;font-style:italic;font-size:20px;line-height:1.3;color:#2c4230;text-align:center;margin:26px 0 0">One cat at a time.</p>
+          <footer style="margin-top:26px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#25b" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#25b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#25b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#25b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#25b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#25b" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.html — move &lt;p class="tagline"&gt; to a sibling of &lt;footer&gt;,
+directly after #notice
+
+newtab.css
+  .tagline      { font-family: var(--font-display); font-style: italic;
+                  font-size: 20px; line-height: 1.3; color: var(--moss-dark);
+                  text-align: center; margin: 26px 0 0; }
+  .footer       { margin-top: 26px; }   /* was 32px */
+  .footer .tagline — delete rule</div>
+    </div>
+
+    <div id="25c" style="width:680px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">25c</span>
+        <span style="font-weight:700;font-size:15px">Centered masthead — wordmark scaled up, tagline beneath</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">The loudest option. Wordmark goes to 1.75rem Fraunces, tagline sits under it in letterspaced mono, actions drop to a centered row. Gives the new tab a title page; costs ~34px of vertical space above the card.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:620px;max-width:100%;margin:0 auto">
+          <header style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;text-align:center">
+            <div>
+              <p style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.75rem;line-height:1.1;letter-spacing:-0.01em;color:#2a2620;margin:0">Tabby</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#6b6154;margin:8px 0 0">One cat at a time</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Explore another area</button>
+              <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Settings</button>
+            </div>
+          </header>
+          <section style="position:relative;overflow:hidden;min-height:170px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0;box-shadow:0 1px 0 rgba(42,38,32,.04)" style-before="content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:#e4e1d3;box-shadow:inset 0 1px 2px rgba(42,38,32,.25);z-index:2">
+            <div style="display:grid;place-items:center;width:calc(100% - 44px);height:210px;margin:22px 22px 0;background:repeating-linear-gradient(135deg,#e4e1d3 0 10px,#dcd7c4 10px 20px);border:1px solid #cdbfa0;border-radius:8px">
+              <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6154">cat photo</span>
+            </div>
+            <div style="padding:16px 22px 22px">
+              <h1 style="margin:0;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.625rem;line-height:1.15;color:#2a2620">Marbles</h1>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:0.5rem 0 0.625rem">Domestic Short Hair · 2 years · Female</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin:2px 0 14px">
+                <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:3px;padding:3px 8px;display:inline-block;color:#b23a2e;transform:rotate(-2deg)">Adoption pending</span>
+              </div>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#6b6154;margin:-0.375rem 0 0.875rem">$125 adoption fee</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.78rem;color:#2c4230;margin:0 0 0.25rem">3.2 mi away from 90210</p>
+              <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:0.75rem;color:#6b6154;margin:0 0 1rem">Updated Today</p>
+              <p style="font-size:0.8125rem;color:#2a2620;margin:0 0 1.375rem"><a href="#25c" style="color:#2c4230;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px">Whisker Haven Rescue</a></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+                <a href="#25c" style="display:flex;align-items:center;justify-content:center;flex:1 1 auto;width:min(100%,220px);text-decoration:none;background:#3f5d42;color:#f6efdd;padding:12px 16px;border-radius:8px;font-size:0.95rem;font-weight:600">View profile</a>
+                <button type="button" style="flex:1 1 auto;width:min(100%,220px);background:transparent;color:#2c4230;border:1.5px solid #3f5d42;border-radius:8px;padding:10.5px 16px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer">Share Marbles</button>
+              </div>
+            </div>
+          </section>
+          <footer style="margin-top:32px;padding-top:18px;border-top:1px solid #cdbfa0;text-align:center">
+            <p style="font-size:12px;color:#6b6154;margin:0 0 6px">Built by <a href="#25c" style="color:#2a2620;font-weight:600;text-decoration:underline;text-underline-offset:2px">Brandon</a></p>
+            <p style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.02em;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;color:#6b6154;margin:0">
+              <a href="#25c" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">GitHub</a><span style="color:#cdbfa0">·</span>
+              <a href="#25c" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Facebook</a><span style="color:#cdbfa0">·</span>
+              <a href="#25c" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">LinkedIn</a><span style="color:#cdbfa0">·</span>
+              <a href="#25c" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Buy me a coffee</a><span style="color:#cdbfa0">·</span>
+              <a href="#25c" style="color:#2c4230;text-decoration:underline;text-underline-offset:2px">Report an issue</a>
+            </p>
+          </footer>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">newtab.html — wrap wordmark + tagline in &lt;div class="brand"&gt;,
+leave .header-actions as the second header child
+
+newtab.css
+  header      { flex-direction: column; align-items: center; gap: 10px;
+                margin-bottom: 20px; text-align: center; }
+  .wordmark   { font-size: 1.75rem; line-height: 1.1;
+                letter-spacing: -0.01em; }
+  .tagline    { font-family: var(--font-mono); font-size: 11.5px;
+                font-weight: 600; letter-spacing: 0.16em;
+                text-transform: uppercase; color: var(--ink-soft);
+                margin: 8px 0 0; }</div>
+    </div>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">Issue #30 — settings view spacing &amp; layout</p>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:56px">
+
+    <div id="30base" style="width:560px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #6b6154;color:#6b6154;border-radius:3px;padding:2px 7px">today</span>
+        <span style="font-weight:700;font-size:15px">Current settings view</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">H1→form gap collapses to 18px. Divider sits 8px/8px. Static label stacks above the input, and the Save button is a separate 8px-radius block floating beside it.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:480px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="letter-spacing:0.14em;text-transform:uppercase;font-size:12px;font-weight:700;color:#6b6154;margin:1em 0">TABBY SETTINGS</p>
+            <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Close</button>
+          </header>
+          <section style="margin-top:18px;padding:22px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0">
+            <h1 style="margin:0 0 12px;font-size:1.5rem;font-weight:700;color:#2a2620">Your Location</h1>
+            <div style="display:flex;flex-direction:column;gap:14px;margin-top:18px">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <button type="button" style="width:100%;border:0;border-radius:8px;padding:10px 14px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-weight:600;font-size:16px;cursor:pointer">Use my location</button>
+              </div>
+              <p style="display:flex;align-items:center;gap:12px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:14px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b6154;margin:8px 0">
+                <span style="flex:1;height:1px;background:#cdbfa0"></span>or<span style="flex:1;height:1px;background:#cdbfa0"></span>
+              </p>
+              <div style="display:flex;gap:8px;align-items:end">
+                <div style="flex:1">
+                  <label style="display:block;font-size:13px;font-weight:700;color:#2a2620">Zip Code <span style="font-weight:400;color:#6b6154">(optional)</span></label>
+                  <input value="" placeholder="90210" style="display:block;width:100%;padding:10px;margin-top:4px;border:1px solid #cdbfa0;border-radius:8px;font:inherit;font-size:16px;background:#f6efdd;color:#2a2620">
+                </div>
+                <button type="button" style="border:0;border-radius:8px;padding:10px 14px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-weight:600;font-size:16px;cursor:pointer">Save</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="30a" style="width:560px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">30a</span>
+        <span style="font-weight:700;font-size:15px">Seamed input group — all four fixes, minimal change</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">28px under the H1, symmetric 18px divider, Bootstrap 5.3 floating label, and the input + Save share one outline with a single seam between them. Click the field to see the label float.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:480px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="letter-spacing:0.14em;text-transform:uppercase;font-size:12px;font-weight:700;color:#6b6154;margin:1em 0">TABBY SETTINGS</p>
+            <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Close</button>
+          </header>
+          <section style="margin-top:18px;padding:22px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0">
+            <h1 style="margin:0 0 28px;font-size:1.5rem;font-weight:700;color:#2a2620">Your Location</h1>
+            <div style="display:flex;flex-direction:column;gap:14px;margin-top:0">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <button type="button" style="width:100%;border:0;border-radius:8px;padding:10px 14px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-weight:600;font-size:16px;cursor:pointer">Use my location</button>
+              </div>
+              <p style="display:flex;align-items:center;gap:12px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:14px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b6154;margin:18px 0">
+                <span style="flex:1;height:1px;background:#cdbfa0"></span>or<span style="flex:1;height:1px;background:#cdbfa0"></span>
+              </p>
+              <div style="display:flex;align-items:stretch;border:1px solid #cdbfa0;border-radius:8px;background:#f6efdd;box-shadow:{{ ringA }}">
+                <div style="position:relative;flex:1">
+                  <input value="{{ zipA }}" onFocus="{{ focusA }}" onBlur="{{ blurA }}" onChange="{{ changeA }}" placeholder=" " style="box-sizing:border-box;display:block;width:100%;height:58px;padding:1rem .75rem;border:0;background:transparent;border-radius:8px 0 0 8px;font:inherit;font-size:16px;line-height:1.25;color:#2a2620;outline:none;padding-top:1.625rem;padding-bottom:.625rem">
+                  <label style="{{ labelA }}">Zip code</label>
+                </div>
+                <button type="button" style="border:0;border-left:1px solid #cdbfa0;border-radius:0 7px 7px 0;padding:0 20px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-weight:600;font-size:16px;cursor:pointer">Save</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">options.html
+  .zip-field &gt; .zip-input-wrap becomes .form-floating,
+  label moves AFTER the input, input gets placeholder=" "
+
+newtab.css
+  .location-panel h1 { margin: 0 0 28px; }      /* was 0 0 12px */
+  form               { margin-top: 0; }          /* was 18px */
+  .or-divider        { margin: 18px 0; }         /* was 8px 0 */
+
+  /* input group */
+  /* relies on newtab.css's existing `* { box-sizing: border-box }` —
+     that reset is what makes height: 58px mean 58px with the
+     floating-label padding applied */
+  .zip-field { display: flex; align-items: stretch; gap: 0;
+               border: 1px solid var(--card-edge); border-radius: 8px;
+               background: var(--paper); }
+  .zip-field:focus-within { box-shadow: 0 0 0 3px rgba(63,93,66,.22); }
+  .zip-field input  { height: 58px; border: 0; background: transparent;
+                      border-radius: 8px 0 0 8px; outline: none; }
+  .zip-field button { border-left: 1px solid var(--card-edge);
+                      border-radius: 0 7px 7px 0; padding: 0 20px; }
+
+  /* floating label — Bootstrap 5.3 .form-floating, trimmed */
+  .form-floating { position: relative; }
+  .form-floating &gt; input { padding: 1rem .75rem; line-height: 1.25; }
+  .form-floating &gt; label {
+    position: absolute; top: 0; left: 0; z-index: 2;
+    height: 100%; padding: 1rem .75rem;
+    font-size: 13px; font-weight: 700; color: var(--ink-soft);
+    pointer-events: none; border: 1px solid transparent;
+    transform-origin: 0 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: opacity .1s ease-in-out, transform .1s ease-in-out; }
+  .form-floating &gt; input:focus,
+  .form-floating &gt; input:not(:placeholder-shown) {
+    padding-top: 1.625rem; padding-bottom: .625rem; }
+  .form-floating &gt; input:focus ~ label,
+  .form-floating &gt; input:not(:placeholder-shown) ~ label {
+    opacity: .65;
+    transform: scale(.85) translateY(-.5rem) translateX(.15rem); }</div>
+    </div>
+
+    <div id="30b" style="width:560px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1.5px solid #b23a2e;color:#b23a2e;border-radius:3px;padding:2px 7px">30b</span>
+        <span style="font-weight:700;font-size:15px">Framed group + helper line — breathing room from content, not margin</span>
+        <span style="font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;background:#3f5d42;color:#f6efdd;border-radius:3px;padding:3px 8px">chosen</span>
+      </div>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.55;color:#6b6154">Same four fixes, but the H1 gets a one-line subhead that does the separating (and explains what the setting is for), and the Save button is a quiet inset segment rather than a second solid block — one control, one primary action on the panel.</p>
+      <div style="background:#e4e1d3;padding:26px;border-radius:12px;border:1px solid #cdbfa0">
+        <div style="width:480px;max-width:100%;margin:0 auto">
+          <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <p style="letter-spacing:0.14em;text-transform:uppercase;font-size:12px;font-weight:700;color:#6b6154;margin:1em 0">TABBY SETTINGS</p>
+            <button type="button" style="border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;cursor:pointer">Close</button>
+          </header>
+          <section style="margin-top:18px;padding:22px;border-radius:14px;background:#f6efdd;border:1px solid #cdbfa0">
+            <h1 style="margin:0 0 6px;font-size:1.5rem;font-weight:700;color:#2a2620">Your Location</h1>
+            <p style="margin:0 0 24px;font-size:14px;line-height:1.5;color:#6b6154">Tabby uses this to find adoptable cats nearest to you.</p>
+            <div style="display:flex;flex-direction:column;gap:14px;margin-top:0">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <button type="button" style="width:100%;border:0;border-radius:8px;padding:10px 14px;background:#3f5d42;color:#f6efdd;font-family:inherit;font-weight:600;font-size:16px;cursor:pointer">Use my location</button>
+              </div>
+              <p style="display:flex;align-items:center;gap:12px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:14px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b6154;margin:18px 0">
+                <span style="flex:1;height:1px;background:#cdbfa0"></span>or<span style="flex:1;height:1px;background:#cdbfa0"></span>
+              </p>
+              <div>
+                <div style="display:flex;align-items:stretch;overflow:hidden;border:1px solid #cdbfa0;border-radius:8px;background:#f6efdd;box-shadow:{{ ringB }}">
+                  <div style="position:relative;flex:1">
+                    <input value="{{ zipB }}" onFocus="{{ focusB }}" onBlur="{{ blurB }}" onChange="{{ changeB }}" placeholder=" " style="box-sizing:border-box;display:block;width:100%;height:58px;padding:1rem .75rem;border:0;background:transparent;font:inherit;font-size:16px;line-height:1.25;color:#2a2620;outline:none;padding-top:1.625rem;padding-bottom:.625rem">
+                    <label style="{{ labelB }}">Zip code</label>
+                  </div>
+                  <button type="button" style="border:0;border-left:1px solid #cdbfa0;border-radius:0;padding:0 22px;background:#eae3cf;color:#2c4230;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Save</button>
+                </div>
+                <p style="margin:8px 2px 0;font-size:12.5px;color:#6b6154">Optional — skip this if you use your location.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#2a2620;color:#f6efdd;border-radius:8px;padding:14px 16px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap">Same as 30a, plus:
+
+options.html
+  &lt;p class="panel-sub"&gt;Tabby uses this to find adoptable cats
+  nearest to you.&lt;/p&gt; after the H1
+  "(optional)" moves out of the label into
+  &lt;p class="field-hint"&gt; below the group
+
+newtab.css
+  .location-panel h1 { margin: 0 0 6px; }
+  .panel-sub  { margin: 0 0 24px; font-size: 14px; line-height: 1.5;
+                color: var(--ink-soft); }
+  .field-hint { margin: 8px 2px 0; font-size: 12.5px;
+                color: var(--ink-soft); }
+  .zip-field  { overflow: hidden; }
+  .zip-field button { background: #eae3cf; color: var(--moss-dark);
+                font-family: var(--font-mono); font-size: 12px;
+                letter-spacing: .08em; text-transform: uppercase;
+                border-radius: 0; padding: 0 22px; }</div>
+    </div>
+  </div>
+
+  <p style="margin:0 0 20px;font-family:ui-monospace,'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2c4230">Open-ended — other things I'd change in newtab.css</p>
+  <div style="display:flex;flex-wrap:wrap;gap:28px">
+    <div style="width:560px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:26px 28px">
+      <p style="margin:0 0 18px;font-weight:700;font-size:15px">Worth fixing</p>
+      <div style="display:flex;flex-direction:column;gap:18px;font-size:13.5px;line-height:1.6;color:#2a2620">
+        <div><strong>Inter is declared but never loaded.</strong> <code style="font-family:ui-monospace,monospace;font-size:12.5px">font-family: Inter, ui-sans-serif, system-ui</code> — Fraunces ships as a woff2, Inter doesn't, so almost everyone gets system-ui. Either drop Inter from the stack so what you design against is what ships, or self-host a subset the way Fraunces already is.</div>
+        <div><strong>No focus-visible styles anywhere.</strong> Every button sets <code style="font-family:ui-monospace,monospace;font-size:12.5px">border: 0</code>, which in Chrome keeps the default ring but it lands off-brand against moss. One rule — <code style="font-family:ui-monospace,monospace;font-size:12.5px">:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px }</code> — covers buttons, links and the zip input, and it's the cheapest accessibility win in the file.</div>
+        <div><strong><code style="font-family:ui-monospace,monospace;font-size:12.5px">color-scheme: light</code> is hard-pinned.</strong> A new tab is the most-seen surface in the browser and this one is a bright cream page at 2am. The palette already has the pieces for a dark variant (ink/paper/wall just swap roles); a <code style="font-family:ui-monospace,monospace;font-size:12.5px">prefers-color-scheme</code> block redefining the eight custom properties would be ~15 lines and need no markup change.</div>
+        <div><strong>Zero transitions.</strong> Every hover is an instant color snap — buttons, links, share menu items. <code style="font-family:ui-monospace,monospace;font-size:12.5px">transition: background-color .12s ease</code> on the button/anchor rules would make the whole thing feel considered without touching layout.</div>
+        <div><strong>The footer's five links compete with the card.</strong> Mono, underlined, and all the same weight, they're the busiest block on a page whose job is one cat. Dropping the underline until hover (or demoting Facebook/LinkedIn behind the credit line) would quiet it — and matters more if the tagline moves out of there per 25a/25b.</div>
+        <div><strong><code style="font-family:ui-monospace,monospace;font-size:12.5px">.shell { margin: 8vh auto }</code> is fragile at short viewports.</strong> On a laptop with a tall portrait photo the card can push the footer well past the fold. <code style="font-family:ui-monospace,monospace;font-size:12.5px">margin: clamp(24px, 8vh, 96px) auto</code> keeps the generous feel on big screens without wasting the top eighth on small ones.</div>
+      </div>
+    </div>
+    <div style="width:560px;background:#f6efdd;border:1px solid #cdbfa0;border-radius:16px;padding:26px 28px">
+      <p style="margin:0 0 18px;font-weight:700;font-size:15px">Noted, but I'd leave alone</p>
+      <div style="display:flex;flex-direction:column;gap:18px;font-size:13.5px;line-height:1.6;color:#2a2620">
+        <div><strong>The rotated chips.</strong> <code style="font-family:ui-monospace,monospace;font-size:12.5px">rotate(-2deg)</code> / <code style="font-family:ui-monospace,monospace;font-size:12.5px">rotate(1.5deg)</code> is the one piece of real personality in the file and it earns the rubber-stamp metaphor. Keep.</div>
+        <div><strong>The <code style="font-family:ui-monospace,monospace;font-size:12.5px">.card::before</code> pin-hole dot.</strong> Subtle, cheap, and it's what sells the card as a physical thing on a wall. Keep.</div>
+        <div><strong>The negative <code style="font-family:ui-monospace,monospace;font-size:12.5px">margin-top</code> on <code style="font-family:ui-monospace,monospace;font-size:12.5px">.fee</code>.</strong> <code style="font-family:ui-monospace,monospace;font-size:12.5px">-0.375rem</code> is doing rhythm correction because the chips row above it has a fixed bottom margin whether or not chips exist. It's brittle but it's inside the card-layout question you said is being decided separately, so I've left it.</div>
+      </div>
+      <p style="margin:26px 0 10px;font-weight:700;font-size:15px">My pick</p>
+      <p style="margin:0;font-size:13.5px;line-height:1.6;color:#2a2620"><a href="#25a">25a</a> for the tagline — it makes the line part of the brand lockup instead of footer furniture, costs almost no vertical space, and unlike <a href="#25c">25c</a> it doesn't turn a new tab into a splash screen. <a href="#25b">25b</a> is the one to pick if you want people to actually feel it rather than just read it. For settings, <a href="#30a">30a</a> if you want the issue closed exactly as written; <a href="#30b">30b</a> if you're open to the panel gaining a line of copy.</p>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1480}}">
+const RING = "0 0 0 3px rgba(63,93,66,.22)";
+const LABEL_BASE = "position:absolute;top:0;left:0;z-index:2;height:100%;padding:1rem .75rem;font-size:13px;font-weight:700;color:#6b6154;pointer-events:none;border:1px solid transparent;transform-origin:0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:opacity .1s ease-in-out,transform .1s ease-in-out;";
+
+class Component extends DCLogic {
+  state = { zipA: "", zipB: "", focusA: false, focusB: false };
+
+  label(floated) {
+    return LABEL_BASE + (floated ? "opacity:.65;transform:scale(.85) translateY(-.5rem) translateX(.15rem);" : "opacity:1;transform:none;");
+  }
+
+  renderVals() {
+    const s = this.state;
+    return {
+      zipA: s.zipA,
+      zipB: s.zipB,
+      labelA: this.label(s.focusA || s.zipA.length > 0),
+      labelB: this.label(s.focusB || s.zipB.length > 0),
+      ringA: s.focusA ? RING : "none",
+      ringB: s.focusB ? RING : "none",
+      focusA: () => this.setState({ focusA: true }),
+      blurA: () => this.setState({ focusA: false }),
+      changeA: (e) => this.setState({ zipA: e.target.value }),
+      focusB: () => this.setState({ focusB: true }),
+      blurB: () => this.setState({ focusB: false }),
+      changeB: (e) => this.setState({ zipB: e.target.value })
+    };
+  }
+}
+</script>
+</body>
+</html>
