@@ -98,7 +98,7 @@ English
 1. **Main card** — the primary new-tab experience: a cat card front and center (name, meta, fee, distance, "Updated" freshness, rescue link, View profile button).
 2. **Explore another area** — the explore banner active, showing the "browse other cities" feature and its "Show another cat" / "Back to my area" links.
 3. **First run** — the "Find cats near you" panel (Use my location / enter ZIP), so users see how onboarding works before installing.
-4. **Settings** — the redesigned settings page (stacked "Use my location" / ZIP layout from the recent redesign).
+4. **Settings** — the redesigned settings page: "Use my location," a floating-label ZIP field joined with Save into a single bordered group (#30).
 5. **Status chips & fee** — a card showing the "Adoption pending" / "Special needs" chips and a normalized adoption fee, to demonstrate the extension surfaces real, practical adoption details.
 6. **Share menu** — the "Share via" popover open on a card, showing the explicit channel list (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) added in v2.1.0.
 
