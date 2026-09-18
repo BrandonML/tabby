@@ -112,6 +112,18 @@ describe('options.js settings logic', () => {
     assert.equal(input.getAttribute('pattern'), '[0-9]{5}');
   });
 
+  it('strips non-digit characters from the ZIP field as they are typed or pasted', () => {
+    const zip = document.getElementById('zip');
+
+    zip.value = 'a1b2c3';
+    zip.dispatchEvent(new window.Event('input'));
+    assert.equal(zip.value, '123');
+
+    zip.value = '9-0210';
+    zip.dispatchEvent(new window.Event('input'));
+    assert.equal(zip.value, '90210');
+  });
+
   it('validates ZIP format on submit', async () => {
     const zip = document.getElementById('zip');
     const form = document.getElementById('settings-form');

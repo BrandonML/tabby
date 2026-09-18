@@ -9,6 +9,14 @@ const useLocation = $("use-location");
 const saved = $("saved");
 const closeSettings = $("close-settings");
 
+// maxlength/pattern only catch a bad ZIP at validation time; strip
+// non-digits as they're typed (or pasted) so it's never possible to
+// enter one in the first place.
+zip.addEventListener("input", () => {
+  const digitsOnly = zip.value.replace(/\D/g, "");
+  if (digitsOnly !== zip.value) zip.value = digitsOnly;
+});
+
 // Same reasoning as newtab.js's showNotice(): #saved reserves visible box
 // space (min-height + flex, via the shared .notice class) even with no
 // text, so hide the element itself rather than leaving a blank gap.
