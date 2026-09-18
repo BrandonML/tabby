@@ -101,6 +101,17 @@ describe('options.js settings logic', () => {
     assert.equal(saved.textContent, '');
   });
 
+  it('zip field keeps the floating-label structure the CSS depends on (#30)', () => {
+    const input = document.getElementById('zip');
+    const label = document.querySelector('label[for="zip"]');
+
+    assert.equal(input.getAttribute('placeholder'), ' ', 'a non-empty placeholder is required for :placeholder-shown to work');
+    assert.equal(input.parentElement.className, 'form-floating', '.form-floating must wrap only the input + label');
+    assert.equal(input.nextElementSibling, label, 'the label must follow the input for the ~ sibling selector to match');
+    assert.equal(input.getAttribute('maxlength'), '5');
+    assert.equal(input.getAttribute('pattern'), '[0-9]{5}');
+  });
+
   it('validates ZIP format on submit', async () => {
     const zip = document.getElementById('zip');
     const form = document.getElementById('settings-form');

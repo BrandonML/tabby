@@ -1641,4 +1641,14 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(document.getElementById('card').querySelector('h1').textContent, 'HomeCat');
     });
   });
+
+  describe('header brand + tagline (#25)', () => {
+    it('wordmark and tagline share a .brand container in the header, not the footer', () => {
+      const brand = document.querySelector('header .brand');
+      assert.ok(brand, '.brand must be a direct part of the header');
+      assert.equal(brand.querySelector('.wordmark').textContent, 'Tabby');
+      assert.equal(brand.querySelector('.tagline').textContent, 'One cat at a time.');
+      assert.ok(!document.querySelector('.footer .tagline'), 'the tagline must not still be duplicated in the footer');
+    });
+  });
 });
