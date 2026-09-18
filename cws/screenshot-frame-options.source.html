@@ -29,17 +29,21 @@
       </header>
       <section class="location-panel">
         <h1>Your Location</h1>
+        <p class="panel-sub">Tabby uses this to find adoptable cats nearest to you.</p>
         <form id="settings-form">
           <div class="location-actions">
             <button id="use-location" class="primary" type="button">Use my location</button>
           </div>
-          <p class="or-divider">or</p>
-          <div class="zip-field">
-            <div class="zip-input-wrap">
-              <label for="zip">Zip Code <span class="label-optional">(optional)</span></label>
-              <input id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="90210">
+          <p class="or-divider"><span></span>or<span></span></p>
+          <div class="zip-field-block">
+            <div class="zip-field">
+              <div class="form-floating">
+                <input id="zip" type="text" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder=" ">
+                <label for="zip">Zip code</label>
+              </div>
+              <button type="submit">Save</button>
             </div>
-            <button type="submit">Save</button>
+            <p class="field-hint">Optional — skip this if you use your location.</p>
           </div>
         </form>
         <p id="saved" class="notice" role="status" hidden></p>
