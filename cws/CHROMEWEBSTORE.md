@@ -187,11 +187,11 @@ https://github.com/BrandonML/tabby
 
 ## Version History
 
-| Version | Date | Changes | Status |
-|---------|------|---------|--------|
-| 0.1.0 | 2026-08-19 | Initial Chrome Web Store submission: location/ZIP search with radius escalation, explore-another-area, adoption fee display, redesigned card layout | Draft |
-| 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button | Submitted |
-| 2.2.0 | 2026-09-18 | Design polish: settings panel spacing + floating-label ZIP/Save input group (#30), tagline moved beside the wordmark (#25), dropped the un-loaded Inter font (#42), focus-visible rings and hover transitions, ZIP field now filters non-digit input as you type | Submitted |
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.1.0 | 2026-08-19 | Initial Chrome Web Store submission: location/ZIP search with radius escalation, explore-another-area, adoption fee display, redesigned card layout |
+| 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button |
+| 2.2.0 | 2026-09-18 | Design polish: settings panel spacing + floating-label ZIP/Save input group (#30), tagline moved beside the wordmark (#25), dropped the un-loaded Inter font (#42), focus-visible rings and hover transitions, ZIP field now filters non-digit input as you type |
 
 
 ## Review Notes
