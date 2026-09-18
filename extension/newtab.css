@@ -197,14 +197,25 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 }
 
 .location-panel { margin-top: 18px; padding: 22px; border-radius: 14px; background: var(--paper); border: 1px solid var(--card-edge); }
-.location-panel h1 { font-size: 1.5rem; margin: 0 0 12px; }
+.location-panel h1 { font-size: 1.5rem; margin: 0 0 6px; }
 .location-panel p { color: var(--ink-soft); margin: 0 0 18px; }
+/* .location-panel p's specificity (a class + a type selector) beats a
+   same-context single-class rule, so .panel-sub/.field-hint/.or-divider's
+   own margins below are scoped through .location-panel too -- otherwise
+   this blanket rule (still needed for #saved, which has no other class)
+   would silently win and the spacing fixes below would never apply. */
+.location-panel .panel-sub {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
 .location-actions { display: flex; flex-direction: column; gap: 10px; }
 .location-actions .primary, .location-actions .secondary { width: 100%; }
 .location-actions .secondary { background: transparent; color: var(--moss-dark); padding: 0; font-weight: 600; text-align: center; }
 .location-actions .secondary:hover { background: transparent; text-decoration: underline; }
 
 form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.location-panel form { margin-top: 0; }
 .or-divider {
   display: flex;
   align-items: center;
@@ -217,12 +228,90 @@ form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
   color: var(--ink-soft);
   margin: 8px 0;
 }
-.or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: var(--card-edge); }
-.zip-field { display: flex; gap: 8px; align-items: end; }
-.zip-input-wrap { flex: 1; }
+.location-panel .or-divider { margin: 18px 0; }
+.or-divider span { flex: 1; height: 1px; background: var(--card-edge); }
 label { display: block; font-size: 13px; font-weight: 700; }
-.label-optional { font-weight: 400; color: var(--ink-soft); }
 input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--card-edge); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
+
+.zip-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--card-edge);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.zip-field:focus-within { box-shadow: 0 0 0 3px rgba(63, 93, 66, .22); }
+.zip-field .form-floating { flex: 1; }
+.zip-field input {
+  height: 58px;
+  margin-top: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.zip-field button {
+  border: 0;
+  border-left: 1px solid var(--card-edge);
+  border-radius: 0;
+  padding: 0 22px;
+  background: #eae3cf;
+  color: var(--moss-dark);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.zip-field button:hover { background: #ddd2b6; }
+.zip-field button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--moss);
+}
+.location-panel .field-hint { margin: 8px 2px 0; font-size: 12.5px; }
+
+.form-floating { position: relative; }
+
+.form-floating > input {
+  padding: 1rem .75rem;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.form-floating > label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  height: 100%;
+  padding: 1rem .75rem;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  pointer-events: none;
+  border: 1px solid transparent;
+  transform-origin: 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity .1s ease-in-out, transform .1s ease-in-out;
+}
+
+.form-floating > input:focus,
+.form-floating > input:not(:placeholder-shown) {
+  padding-top: 1.625rem;
+  padding-bottom: .625rem;
+}
+
+.form-floating > input:focus ~ label,
+.form-floating > input:not(:placeholder-shown) ~ label {
+  opacity: .65;
+  transform: scale(.85) translateY(-.5rem) translateX(.15rem);
+}
 
 .notice {
   min-height: 1.3em;
