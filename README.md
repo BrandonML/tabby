@@ -62,6 +62,16 @@ Three GitHub Actions workflows automate the release process end to end — see [
 
 To manually smoke-test the unpacked extension against a real deployed backend (as opposed to packaging a release), temporarily edit `BACKEND_URL` in `extension/config.js` yourself, reload the unpacked extension, test, then revert the edit (`git checkout -- extension/config.js`) before committing anything or running the test suite.
 
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.1.0 | 2026-08-19 | Initial Chrome Web Store submission: location/ZIP search with radius escalation, explore-another-area, adoption fee display, redesigned card layout |
+| 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button |
+| 2.2.0 | 2026-09-18 | Design polish: settings panel spacing + floating-label ZIP/Save input group (#30), tagline moved beside the wordmark (#25), dropped the un-loaded Inter font (#42), focus-visible rings and hover transitions, ZIP field now filters non-digit input as you type |
+
+Add a row here as part of every release PR — see [RELEASE.md](RELEASE.md).
+
 ## Validation
 
 ```powershell

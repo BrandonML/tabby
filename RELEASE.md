@@ -10,7 +10,7 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 
 - [ ] Default: open a pull request straight from the feature branch into `main` — don't merge locally and push. Going through a PR is what lets the ruleset above actually gate the merge on CI passing (a direct push of an untested commit is rejected outright, since it can never satisfy the required check). The ruleset gates on the *target* branch (`main`) requiring a PR + a green `test` check — it doesn't care what the source branch is named, so there's no need to create a `dev` branch just to have one.
 - [ ] Exception: if several feature branches are ready to ship together, merge them all into a shared `dev` branch first, then open one PR from `dev` into `main`. Use this only when bundling multiple branches — a single feature branch goes straight to `main`.
-- [ ] Bump `manifest.json`/`package.json` to the new version and add a row to `cws/CHROMEWEBSTORE.md`'s Version History table, as a commit on the same branch/PR — this is what `tag-release.yml` reads post-merge, so it needs to land in the same merge as the change it describes rather than as a follow-up.
+- [ ] Bump `manifest.json`/`package.json` to the new version and add a row to [README.md](README.md)'s Version History table, as a commit on the same branch/PR — this is what `tag-release.yml` reads post-merge, so it needs to land in the same merge as the change it describes rather than as a follow-up.
 - [ ] Wait for the `test` check to go green. If it's red, stop — do not merge.
 - [ ] Merge the PR.
 
@@ -24,7 +24,7 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 - [ ] Build the release zip: `npm run release <version> https://p01--tabby--bklqdgzwx4md.code.run`
 - [ ] Upload `dist/v<version>.zip` to the Chrome Web Store dashboard, submit for review.
 - [ ] Upload the same zip to the Edge Add-ons dashboard, submit for review.
-- [ ] Update listing copy/screenshots if the release changes what's visibly different to a user.
+- [ ] Update listing copy/screenshots in [webstore/WEBSTORE.md](webstore/WEBSTORE.md) if the release changes what's visibly different to a user.
 
 ## Why store review lag isn't a problem
 
