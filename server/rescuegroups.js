@@ -3,6 +3,13 @@ const CONTENT_TYPE = "application/vnd.api+json";
 const RADIUS_STEPS = [25, 75, 150, 250];
 const MAX_LIMIT = 100;
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+// See issue #40's field audit: availableDate drifts 9-17 days from the true
+// RG-admin status-change date in both directions, and updatedDate lags
+// further behind whenever something else is edited after the fact. 60 days
+// is wide enough to absorb that drift without keeping the badge on
+// long-settled listings.
+const NEW_BADGE_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+const SENIOR_AGE_YEARS = 10;
 
 function normalizeUrl(value) {
   if (typeof value !== "string") return null;
@@ -56,7 +63,8 @@ function normalizeAdoptionFee(value) {
 const ANIMAL_FIELDS = [
   "name", "ageString", "sex", "distance", "url", "pictureCount",
   "pictureThumbnailUrl", "breedString", "descriptionText", "isSpecialNeeds",
-  "isAdoptionPending", "updatedDate", "updatedAt", "adoptionFeeString"
+  "isAdoptionPending", "updatedDate", "updatedAt", "adoptionFeeString",
+  "availableDate", "adoptedDate", "birthDate", "ageGroup"
 ].join(",");
 
 export function validateLocation(input) {
@@ -108,6 +116,52 @@ function getBestPicture(pictures) {
   return null;
 }
 
+// Issue #40's recommended logic, minus the statuses.name check: the search
+// request already hits .../search/available/... so every animal reaching
+// this function is already Available -- that branch could never be false.
+function computeIsNew(attrs, updatedAtIso) {
+  const availableTime = timestampValue(attrs.availableDate);
+  if (availableTime === null) return false; // some orgs don't populate this field; nothing to fall back to
+  const updatedTime = timestampValue(updatedAtIso);
+  const now = Date.now();
+  if (attrs.adoptedDate) {
+    // Adopted-then-returned: RG freezes availableDate at the original listing
+    // date on a return, so updatedDate is the better proxy here -- a
+    // hypothesis validated against one manually-checked case (issue #40),
+    // not a fully proven signal.
+    return updatedTime !== null && now - updatedTime <= NEW_BADGE_WINDOW_MS;
+  }
+  const withinAvailableWindow = now - availableTime <= NEW_BADGE_WINDOW_MS;
+  // Free upper-bound sanity check: updatedDate can never predate the true
+  // status-change date, so if it's stale the animal can't be newly
+  // available either. Missing entirely, it just can't rule anything out.
+  const withinUpdatedCeiling = updatedTime === null || now - updatedTime <= NEW_BADGE_WINDOW_MS;
+  return withinAvailableWindow && withinUpdatedCeiling;
+}
+
+function ageYears(birthDateValue) {
+  const birth = new Date(birthDateValue);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let years = now.getUTCFullYear() - birth.getUTCFullYear();
+  const monthDiff = now.getUTCMonth() - birth.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < birth.getUTCDate())) years--;
+  return years;
+}
+
+// birthDate is what ageString is itself derived from (per RG's field docs,
+// ageString only exists "assuming a birth date value exists"), so checking
+// birthDate directly is both simpler and more precise than parsing
+// ageString's free text. ageGroup is a secondary, user-entered signal
+// only trusted when birthDate isn't available at all.
+function computeIsSenior(attrs) {
+  if (attrs.birthDate) {
+    const years = ageYears(attrs.birthDate);
+    return years !== null && years >= SENIOR_AGE_YEARS;
+  }
+  return attrs.ageGroup === "Senior";
+}
+
 export function normalizeCards(payload) {
   const index = includedIndex(payload.included);
   return (payload.data || []).map((animal) => {
@@ -138,6 +192,8 @@ export function normalizeCards(payload) {
       rescueUrl,
       isAdoptionPending: Boolean(attrs.isAdoptionPending),
       isSpecialNeeds: Boolean(attrs.isSpecialNeeds),
+      isNew: computeIsNew(attrs, updatedAt),
+      isSenior: computeIsSenior(attrs),
       adoptionFee: normalizeAdoptionFee(attrs.adoptionFeeString),
       description: attrs.descriptionText || null,
       updatedAt

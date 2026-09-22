@@ -178,6 +178,72 @@ test("normalizer prepends a missing $ to bare numeric adoption fees", () => {
   assert.equal(cardWithFee("100 for both"), "$100 for both");
 });
 
+function daysAgoIso(days) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function cardWith(extraAttrs) {
+  return normalizeCards({
+    data: [{ id: "1", attributes: { name: "Milo", updatedDate: daysAgoIso(1), ...extraAttrs }, relationships: { orgs: { data: [{ id: "o", type: "orgs" }] }, pictures: { data: [{ id: "p1", type: "pictures" }] } } }],
+    included: [
+      { id: "o", type: "orgs", attributes: { name: "Rescue" } },
+      { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "https://images.test/milo.jpg" } } }
+    ]
+  })[0];
+}
+
+// issue #40: availableDate is the required primary signal -- an org that
+// doesn't populate it (it's optional per-org) must be excluded entirely,
+// never defaulted to another field.
+test("isNew is false when availableDate is missing, even if everything else looks fresh", () => {
+  assert.equal(cardWith({ updatedDate: daysAgoIso(1) }).isNew, false);
+});
+
+test("isNew is true when availableDate is within the 60-day window and updatedDate doesn't rule it out", () => {
+  assert.equal(cardWith({ availableDate: daysAgoIso(10), updatedDate: daysAgoIso(1) }).isNew, true);
+});
+
+test("isNew is false once availableDate falls outside the 60-day window", () => {
+  assert.equal(cardWith({ availableDate: daysAgoIso(75), updatedDate: daysAgoIso(1) }).isNew, false);
+});
+
+// updatedDate can never predate the true status-change date, so a stale
+// updatedDate is a hard ceiling even when availableDate itself looks recent.
+test("isNew is false when updatedDate is stale, even if availableDate is recent", () => {
+  assert.equal(cardWith({ availableDate: daysAgoIso(10), updatedDate: daysAgoIso(90) }).isNew, false);
+});
+
+// Adopted-then-returned (issue #40's Loretta case): availableDate freezes at
+// the original listing date, so updatedDate becomes the proxy instead.
+test("isNew uses updatedDate instead of availableDate when adoptedDate is present (return case)", () => {
+  assert.equal(cardWith({ availableDate: daysAgoIso(400), adoptedDate: daysAgoIso(200), updatedDate: daysAgoIso(5) }).isNew, true);
+  assert.equal(cardWith({ availableDate: daysAgoIso(10), adoptedDate: daysAgoIso(200), updatedDate: daysAgoIso(90) }).isNew, false);
+});
+
+test("isSenior is true when birthDate implies an age of 10 or more", () => {
+  const tenYearsAgo = new Date();
+  tenYearsAgo.setUTCFullYear(tenYearsAgo.getUTCFullYear() - 10);
+  assert.equal(cardWith({ birthDate: tenYearsAgo.toISOString().slice(0, 10) }).isSenior, true);
+});
+
+test("isSenior is false when birthDate implies an age under 10", () => {
+  const nineYearsAgo = new Date();
+  nineYearsAgo.setUTCFullYear(nineYearsAgo.getUTCFullYear() - 9);
+  assert.equal(cardWith({ birthDate: nineYearsAgo.toISOString().slice(0, 10) }).isSenior, false);
+});
+
+// ageGroup is only a fallback -- issue #44 calls it less reliable than
+// birthDate and says it should only be used when birthDate has no data.
+test("isSenior falls back to ageGroup only when birthDate is absent", () => {
+  assert.equal(cardWith({ ageGroup: "Senior" }).isSenior, true);
+  assert.equal(cardWith({ ageGroup: "Baby" }).isSenior, false);
+  assert.equal(cardWith({}).isSenior, false);
+});
+
+test("isSenior does not fall back to ageGroup when birthDate is present but unparsable", () => {
+  assert.equal(cardWith({ birthDate: "not-a-date", ageGroup: "Senior" }).isSenior, false);
+});
+
 test("normalizer leaves already-priced adoption fees untouched", () => {
   assert.equal(cardWithFee("$150"), "$150");
   assert.equal(cardWithFee("$50-100"), "$50-100");

@@ -120,6 +120,8 @@ describe('newtab.js DOM manipulation', () => {
       imageUrl: "https://image.org/cat.jpg",
       isAdoptionPending: true,
       isSpecialNeeds: true,
+      isNew: true,
+      isSenior: true,
       adoptionFee: "$50"
     };
 
@@ -147,7 +149,23 @@ describe('newtab.js DOM manipulation', () => {
 
     const fee = card.querySelector('.fee');
     assert.equal(fee.textContent, "$50");
+
+    const badges = card.querySelectorAll('.badge');
+    assert.equal(badges.length, 2);
+    assert.equal(badges[0].textContent, "New");
+    assert.ok(badges[0].classList.contains('new'));
+    assert.equal(badges[1].textContent, "Senior");
+    assert.ok(badges[1].classList.contains('senior'));
+    assert.ok(card.querySelector('.photo-frame').contains(badges[0]), "badges must overlay the photo frame, not the content section");
   });
+
+  it('renderCard omits the badges container entirely when neither isNew nor isSenior is set', () => {
+    window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" }, { stale: false });
+    const card = document.getElementById("card");
+    assert.equal(card.querySelectorAll('.badge').length, 0);
+    assert.equal(card.querySelectorAll('.badges').length, 0);
+  });
+
   describe('renderCard long-name handling', () => {
     it('adds the name-long modifier once the name passes 18 characters', () => {
       window.renderCard({ name: "Sir Reginald Fluffington III" });

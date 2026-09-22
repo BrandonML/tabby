@@ -88,11 +88,16 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
   z-index: 2;
 }
 
+.photo-frame {
+  position: relative;
+  width: calc(100% - 44px);
+  margin: 22px 22px 0;
+}
 .photo {
   display: block;
-  width: calc(100% - 44px);
+  width: 100%;
   height: min(42vh, 350px);
-  margin: 22px 22px 0;
+  margin: 0;
   object-fit: cover;
   object-position: center;
   background: var(--wall);
@@ -101,6 +106,29 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 }
 .photo-portrait-mild { height: min(50vh, 420px); object-position: top; }
 .photo-portrait { height: min(65vh, 560px); object-position: top; }
+
+/* Overlaid on the photo itself (issues #40/#44) -- solid pills, distinct
+   from the outlined .chip row below the photo, so they read as a callout
+   rather than blending into the metadata. Laid out side by side (both
+   anchored to the photo's top-left) so both can show at once (e.g. a
+   senior cat newly available) without crowding. */
+.badges { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: var(--paper);
+  display: inline-block;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.badge.new { background: var(--moss); }
+.badge.senior { background: var(--stamp); }
 
 .content { padding: 16px 22px 22px; }
 
@@ -198,7 +226,7 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .share-menu-item:hover { background: var(--wall); }
 
 @media (max-width: 360px) {
-  .photo { width: calc(100% - 32px); margin: 16px 16px 0; }
+  .photo-frame { width: calc(100% - 32px); margin: 16px 16px 0; }
   .content { padding: 14px 16px 18px; }
 }
 

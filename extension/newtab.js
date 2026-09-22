@@ -292,6 +292,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   const distance = card.distanceMiles != null ? `${card.distanceMiles.toFixed(1)} mi away${distanceSuffix}` : null;
   const updatedAt = readingFormat(card.updatedAt);
   const chips = [card.isAdoptionPending && { label: "Adoption pending", className: "pending" }, card.isSpecialNeeds && { label: "Special needs", className: "special-needs" }].filter(Boolean);
+  const badges = [card.isNew && { label: "New", className: "new" }, card.isSenior && { label: "Senior", className: "senior" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
   const profileUrl = card.profileUrl;
 
@@ -299,6 +300,9 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   cardContainer.className = "card";
   cardContainer.hidden = false;
   cardContainer.textContent = ""; // Clear securely
+
+  const photoFrame = document.createElement("div");
+  photoFrame.className = "photo-frame";
 
   const img = document.createElement("img");
   img.className = "photo";
@@ -324,7 +328,21 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     }
     if (isPortrait) applyContentAwareCrop(img, card.imageUrl);
   });
-  cardContainer.appendChild(img);
+  photoFrame.appendChild(img);
+
+  if (badges.length > 0) {
+    const badgesDiv = document.createElement("div");
+    badgesDiv.className = "badges";
+    for (const badge of badges) {
+      const badgeSpan = document.createElement("span");
+      badgeSpan.className = `badge ${badge.className}`;
+      badgeSpan.textContent = badge.label;
+      badgesDiv.appendChild(badgeSpan);
+    }
+    photoFrame.appendChild(badgesDiv);
+  }
+
+  cardContainer.appendChild(photoFrame);
 
   const content = document.createElement("div");
   content.className = "content";
