@@ -37,6 +37,14 @@ Do not modify these autonomously unless explicitly required:
 - **Zero Breaking Changes:** Refactors must leave functionality fully intact.
 - **TODOs:** Do not leave new `TODO` or `FIXME` comments in committed code.
 
+### Documentation & Asset Currency
+Docs and store-facing assets are part of the deliverable, not an afterthought — a change isn't done just because the code and tests are. Whenever a change makes any of the following inaccurate, update it, don't let it silently drift:
+- `README.md` — architecture/behavior description, setup steps, Version History.
+- `RELEASE.md` — the runbook itself, whenever the actual release process changes (a workflow renamed, a step added/removed/reordered, a URL that changes). An inaccurate runbook is worse than none, since it gets followed literally.
+- `webstore/WEBSTORE.md` — listing copy, permissions justifications, and its screenshot/promo assets (via the `.source.html` capture harnesses in `/webstore`) — whenever a release changes what's visibly different to a user.
+
+**How to apply:** If the fix is small (a sentence, a table row, a copy tweak), make it in the same PR as the change that caused the drift — don't defer it. If it's a larger asset-generation task (e.g. regenerating screenshots), don't do it unprompted and don't silently skip it either: flag it and, once confirmed, file a tracking issue describing exactly what's stale and why (see [issue #66](https://github.com/BrandonML/tabby/issues/66) for the pattern — filed when the icon-menu change made the screenshot capture harness's hardcoded header markup stale). This is checked twice: informally during any PR that changes user-visible behavior, the release process, or permissions; and as a hard gate immediately before a release ships (see RELEASE.md's pre-merge checklist) — that's the last checkpoint before something inaccurate becomes visible to real users on the live store listing.
+
 ---
 
 ## 2. Tabby Architecture & Project Directives
@@ -55,7 +63,7 @@ Tabby's top-level directories each have a distinct role. Scope your changes stri
 - **Live-API changes:** any change to search radius, pagination, or the RescueGroups query contract needs a manual `npm run test:live` run against the real API before merging (requires a real `RG_API_KEY`; excluded from `npm test`/CI by design).
 
 ### `/webstore` (Chrome Web Store + Edge Add-ons listing)
-- Holds `WEBSTORE.md` (listing copy, permissions justifications, screenshots/promo assets) and the screenshot-capture harnesses used to regenerate them. Not test-covered; update listing copy/screenshots here when a release changes what's visibly different to a user (see [RELEASE.md](RELEASE.md)).
+- Holds `WEBSTORE.md` (listing copy, permissions justifications, screenshots/promo assets) and the screenshot-capture harnesses used to regenerate them. Not test-covered; see "Documentation & Asset Currency" above for when and how to keep this current.
 
 ### `/benchmark` (manual perf-profiling scripts)
 - Ad hoc scripts that justify a past or prospective optimization with real numbers — not correctness tests, not run by `npm test`/CI, run manually (`node benchmark/<name>.js`). Keep a script only as long as it reflects something real in the live code; delete it (don't leave it as silent clutter) once the function it profiles is removed or rewritten, the way `benchmark.js` was removed here after the DOM-based HTML-escaping approach it profiled was replaced by textContent-only rendering.
