@@ -1,3 +1,10 @@
+// Manual perf-profiling script justifying the Set-based lookup in
+// extension/newtab.js's real nextCard() (see PR that introduced it) with
+// real numbers -- not run by `npm test` or CI, run manually with
+// `node benchmark/benchmark_nextCard.js` when touching that function again.
+// Its sibling benchmark.js (for a since-removed DOM-based HTML-escaping
+// approach, replaced by textContent-only rendering) was removed since it no
+// longer corresponds to anything in the live codebase.
 import { performance } from 'perf_hooks';
 
 // Mock randomCard

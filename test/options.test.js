@@ -49,7 +49,7 @@ describe('options.js settings logic', () => {
       tabs: {
         query: (query, cb) => cb([]),
         create: (opts, cb) => { if(cb) cb(); },
-        remove: (id) => {}
+        remove: (_id) => {}
       }
     };
 

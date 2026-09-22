@@ -26,6 +26,15 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 - [ ] Upload the same zip to the Edge Add-ons dashboard, submit for review.
 - [ ] Update listing copy/screenshots in [webstore/WEBSTORE.md](webstore/WEBSTORE.md) if the release changes what's visibly different to a user.
 
+## If a release fails
+
+- **`test` check red pre-merge:** don't merge. Fix on the same branch/PR and wait for green — there's nothing to roll back since nothing shipped yet.
+- **`deploy-verify.yml` red or times out post-merge:** the code already merged to `main` and Northflank already tried to build/deploy it — **do not proceed to Store submission (section 4)** until this is resolved, since it means production isn't confirmed to be running what you think it's running.
+  1. Check the `tabby` service's build/deploy logs directly on Northflank first — most failures are a bad build (syntax error, missing env var) or a crash on boot, both visible there immediately.
+  2. If the build succeeded but `/healthz` never reported the new SHA, check that the `tabby` service still has `NF_DEPLOYMENT_SHA` wired up as a runtime env var — without it `/healthz` always reports `sha: null` and `deploy-verify.yml` will time out even on a perfectly healthy deploy.
+  3. If the merged commit itself is the problem, fix forward: open a normal PR (a plain revert via `git revert` is the fastest fix-forward option) through the usual pre-merge flow above. There's no separate "rollback" mechanism — merging the revert triggers the same Northflank auto-build and `deploy-verify.yml` run as any other change, which is what confirms the rollback actually took effect.
+  4. Only re-attempt store submission once `deploy-verify.yml` is green against the commit you actually intend to ship.
+
 ## Why store review lag isn't a problem
 
 Northflank deploys in minutes; CWS/EWS review takes hours, and browsers don't auto-update installed extensions instantly even after approval — so there's always a window where some users are on an older extension version talking to the new server. This is safe as long as every server change is **additive**: never remove or change an existing endpoint/field an older client version depends on in the same release that ships a client relying on the removal. A new endpoint an old client never calls is always safe to ship ahead of the client that uses it.

@@ -1,3 +1,6 @@
+/* eslint-disable no-eval -- evaluates the real, trusted service-worker.js
+   source under a mocked global.chrome to exercise its top-level listener
+   registration; not eval of any external or user-controlled input. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
