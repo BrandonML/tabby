@@ -6,6 +6,6 @@ extension
 test
 test-live
 benchmark
-cws
+webstore
 tasks
 *.md

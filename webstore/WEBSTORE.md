@@ -1,10 +1,15 @@
-# Chrome Web Store Listing — Tabby
+# Web Store Listing — Tabby
 
-> Last Updated: 2026-08-19
+> Last Updated: 2026-09-22
+
+**Chrome Web Store:** https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig
+**Edge Add-ons:** https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho
+
+Both stores use the same package and listing content below — Edge is Chromium-based and needs no code changes (see [RELEASE.md](../RELEASE.md)).
 
 ## Store Listing
 
-**Extension Name** [REQUIRED]
+**Extension Name**
 Tabby: New Tab for Adoptable Cats
 <!-- Matches manifest.json "name" (33 chars). "Tabby" kept per instruction. Researched real "new
      tab" category listings on the live store: "New Tab" appears in 7 of 9 sampled titles,
@@ -17,7 +22,7 @@ Tabby: New Tab for Adoptable Cats
      listings found in an earlier search. -->
 
 
-**Short Description** [REQUIRED]
+**Short Description**
 See one real, nearby adoptable cat on every new tab.
 <!-- 52 chars (down from 108). Matches manifest.json "description" (this field doubles as both).
      Trimmed the trailing mechanism detail ("from RescueGroups.org... Search by location or ZIP
@@ -27,7 +32,7 @@ See one real, nearby adoptable cat on every new tab.
      extension's function" guidance. -->
 
 
-**Detailed Description** [REQUIRED]
+**Detailed Description**
 <!-- 2,169 / 16,000 chars. Plain text, no markdown — CWS strips it. -->
 ```
 Tabby replaces your new tab page with one real, adoptable cat at a time — sourced live from RescueGroups.org, the same database thousands of shelters and rescues use every day.
@@ -58,23 +63,12 @@ Found a bug or have a suggestion? Open an issue at github.com/BrandonML/tabby/is
 ```
 
 
-**Category** [REQUIRED] — ⚠️ NEEDS YOUR INPUT
-<!-- Chrome Web Store's public category taxonomy (now grouped under "Productivity," "Lifestyle,"
-     and "Make Chrome Yours") is not fully published outside the signed-in Developer Dashboard,
-     and I couldn't reliably enumerate the current option names without your dashboard access —
-     I'd rather flag that than guess at exact labels. Open the Store Listing tab in the
-     dashboard and pick the closest fit; based on what Tabby does (new-tab replacement themed
-     around pet adoption, not a work-productivity tool), the "Lifestyle" group is the better fit
-     over "Productivity" — pick whichever specific category under it best matches (something
-     animal/pets-adjacent if offered, otherwise a general "Lifestyle" or "Fun" option). -->
-
-
-**Single Purpose** [REQUIRED]
+**Single Purpose**
 Tabby replaces the new tab page with a single real, adoptable cat sourced live from RescueGroups.org, based on the user's location or ZIP code, with an optional feature to browse adoptable cats in other U.S. cities. The extension's only function is surfacing real shelter/rescue cat listings on the new tab page — it does not manage tabs, bookmarks, or any unrelated browser feature.
 <!-- 391 / 1000 chars -->
 
 
-**Primary Language** [REQUIRED]
+**Primary Language**
 English
 
 
@@ -82,8 +76,8 @@ English
 
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
-| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready (existing) | `extension/icons/icon128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `screenshot-1-main-card.png` |
+| Store Icon | 128×128 PNG | ✅ Ready (existing) | `extension/icons/icon128.png` |
+| Screenshot 1 | 1280×800 | ✅ Ready | `screenshot-1-main-card.png` |
 | Screenshot 2 [RECOMMENDED] | 1280×800 | ✅ Ready | `screenshot-2-explore.png` |
 | Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready | `screenshot-3-first-run.png` |
 | Screenshot 4 | 1280×800 | ✅ Ready | `screenshot-4-settings.png` |
@@ -156,7 +150,7 @@ Tabby does not execute any remotely hosted code. All JavaScript running in the e
 
 ## Privacy Policy
 
-**Privacy Policy URL** [REQUIRED]
+**Privacy Policy URL**
 `https://github.com/BrandonML/tabby/blob/main/PRIVACY.md`
 <!-- Confirmed: GitHub blob URL. Live once PRIVACY.md is merged to main — verify it loads (not a 404)
      before submitting, per the pre-publish checklist. -->
@@ -169,12 +163,8 @@ Tabby does not execute any remotely hosted code. All JavaScript running in the e
 
 ## Developer Info
 
-**Publisher Name** [REQUIRED]
+**Publisher Name**
 BrandonML
-
-**Contact Email** [REQUIRED] — ⚠️ NEEDS YOUR INPUT
-<!-- Left open intentionally — displayed publicly on the store listing, so fill in whichever
-     address you're comfortable exposing and want to monitor for CWS policy notices. -->
 
 **Support URL / Email** [RECOMMENDED]
 https://github.com/BrandonML/tabby/issues
@@ -183,23 +173,3 @@ https://github.com/BrandonML/tabby/issues
 
 **Homepage URL** [RECOMMENDED]
 https://github.com/BrandonML/tabby
-
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 0.1.0 | 2026-08-19 | Initial Chrome Web Store submission: location/ZIP search with radius escalation, explore-another-area, adoption fee display, redesigned card layout |
-| 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button |
-| 2.2.0 | 2026-09-18 | Design polish: settings panel spacing + floating-label ZIP/Save input group (#30), tagline moved beside the wordmark (#25), dropped the un-loaded Inter font (#42), focus-visible rings and hover transitions, ZIP field now filters non-digit input as you type |
-
-
-## Review Notes
-
-### Known Issues / Limitations
-- **`extension/config.js`'s `BACKEND_URL` is still `http://localhost:8787`.** Per the README, this must be updated to the deployed server's real HTTPS endpoint before packaging the release build — as it stands, a real user's install would try to talk to `localhost` and every search would fail. This has to happen before `npm run release` is run for the actual submission, not just before writing this document. Deploying the server and getting its permanent URL also has to happen *before* `ALLOW_ORIGIN` on that server can be locked down to the real `chrome-extension://<ID>` origin (which Chrome only assigns once the item exists in the dashboard) — see the README's "Production deployment" section for the full sequencing.
-- Screenshots/promo images use realistic sample data (see Screenshot Notes above) rather than a live capture against a real user's location, since this was generated in an automated environment without a live browsing session or real GPS location.
-- Category is still flagged above as an open item (pick in-dashboard). Publisher Name and Privacy Policy hosting are now settled; Contact Email is intentionally left for you to fill in directly since it's published publicly.
-
-### Rejection History
-None yet — first submission.
