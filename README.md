@@ -1,15 +1,16 @@
 # Tabby
 
-**[Get Tabby on the Chrome Web Store](https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig)**
+**[Get Tabby on the Chrome Web Store](https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig)** · **[Get Tabby on Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho)**
 
-Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a nearby, photo-ready adoptable cat. It uses a cache-first UI and a small backend proxy so the RescueGroups public API key never ships in the extension.
+Tabby is a Manifest V3 extension (Chrome and Edge) that replaces the new tab page with a nearby, photo-ready adoptable cat. It uses a cache-first UI and a small backend proxy so the RescueGroups public API key never ships in the extension.
 
-## What is included
+## How Tabby works
 
-- New-tab UI with instant cached-card rendering and stale-while-revalidate refresh.
+- New-tab UI with instant cached-card rendering and stale-while-revalidate refresh: the last-fetched batch renders immediately from `chrome.storage.local`, and a background refresh only fires once the cache is at least 5 minutes old **and** the user has seen at least 85% of the cached cards — so a batch the user hasn't finished browsing isn't discarded early.
 - Browser-coordinate lookup with native postal-code fallback.
-- Server-side 25 -> 75 -> 150 -> 250 mile radius ladder, escalating on cumulative deduplicated results until 40 unique cats are found.
-- RescueGroups `available/cats/haspic` query, nearest-first sorting, picture validation, organization join, and safe profile-url fallback.
+- Server-side 25 -> 75 -> 150 -> 250 mile radius ladder: widens the radius, deduplicating by cat ID across steps, until at least 40 unique cats are accumulated or the 250-mile step is reached, whichever comes first — 40 is a floor, not a target. Whatever's accumulated is then capped at 100 cats (closest-first) before being sent to the extension.
+- RescueGroups `available/cats/haspic` query — only cats in "available" status with at least one photo are ever shown — plus nearest-first sorting, picture validation, organization join, and safe profile-url fallback.
+- Listings whose most recent update is more than a year old are filtered out server-side, so Tabby never surfaces an abandoned or long-stale listing.
 - Content-aware crop for portrait photos: a row-wise edge-energy heuristic finds the likely subject band instead of always anchoring to the top, via a small hostname-locked analysis-thumbnail proxy (`GET /api/photo-thumb`) that works around RescueGroups' CDN sending no CORS headers.
 - "Share this cat" via the Web Share API, attaching the actual photo (fetched through a second hostname-locked, share-sized proxy, `GET /api/photo-share`, for the same CORS reason as the crop analysis above) alongside the cat's details, a Tabby tagline, and its RescueGroups profile link. Degrades to a link-only native share if the photo can't be attached, and to a clipboard-copy if the platform has no Web Share API at all.
 - No third-party runtime dependencies; Node's built-in test runner.
