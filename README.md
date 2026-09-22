@@ -43,6 +43,8 @@ The in-memory cache is correct as-is for the intended deployment target: a singl
 
 `/api/nearby-cats` is also rate-limited per client IP (30 requests / 5 minutes, in-memory, same deployment assumption as the cache above) — a cache miss costs a real RescueGroups API call, so this bounds how much a script varying postal codes/coordinates can cost regardless of the response cache. The client IP is taken from `X-Forwarded-For` when present (Northflank and similar platforms terminate the real connection and forward, so `request.socket.remoteAddress` alone would otherwise be the platform's internal proxy address for every request), falling back to the raw socket address only when that header is absent, as in local dev. If a future host doesn't set `X-Forwarded-For` in front of this server, every request would be seen as one shared IP.
 
+- `ALERT_WEBHOOK_URL` — optional. When set, the server posts a Discord-compatible webhook message (a JSON body with a `content` field) whenever upstream RescueGroups failures spike: 5+ failures within a rolling 10-minute window, with a 30-minute cooldown between alerts so a sustained outage doesn't spam the channel. Left unset, alerting is a no-op — this exists because a real RescueGroups connectivity incident once went undetected for hours with errors only reaching server logs.
+
 Once the server has a real HTTPS URL, package the extension with:
 
 ```powershell
