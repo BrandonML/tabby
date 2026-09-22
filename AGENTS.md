@@ -22,7 +22,7 @@ Run this checklist at the start of every task.
 
 ### Security-First Coding
 - **XSS Prevention:** Never trust user input. Use `textContent` over `innerHTML`.
-- **Safe Execution:** `eval()`, `new Function()`, and all `unsafe-eval` patterns are strictly forbidden.
+- **Safe Execution:** `eval()`, `new Function()`, and all `unsafe-eval` patterns are strictly forbidden. `npm run lint` (`eslint.config.js`) enforces `no-eval`/`no-implied-eval`/`no-new-func`/`no-script-url` automatically — a legitimate, narrow exception (e.g. a test harness evaluating trusted source) needs an inline `eslint-disable` comment explaining why, not a rule change.
 - **Least Privilege:** Minimize scope. Do not request permissions or API scopes not strictly required.
 - **Dependency Management:** Only introduce new packages if strictly required and justify them in the commit message.
 
@@ -84,7 +84,9 @@ Full runbook: [RELEASE.md](RELEASE.md). In short, once a PR with a version bump 
 
 ## 4. Testing & QA
 
-Run tests via the `/test` directory.
+Run tests via the `/test` directory. `npm run lint` and `npm test` both run in CI's
+`test` job (the one the `main` ruleset requires) — run both locally before opening
+a PR; a lint failure blocks merge exactly like a test failure does.
 
 Use the following tiers to scope how much testing a change needs. An agent's own
 judgment that a change is "probably fine to skip" is **not** sufficient — only the

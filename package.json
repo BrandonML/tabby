@@ -7,9 +7,13 @@
     "test": "node --test",
     "test:live": "node --env-file-if-exists=.env --test test-live/rescuegroups.live.js",
     "start:server": "node --env-file-if-exists=.env server/index.js",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "jsdom": "^29.1.1"
   }
 }

@@ -24,7 +24,7 @@ describe("server cache", () => {
     process.env.RG_API_KEY = "test-key";
 
     // Mock global fetch to return a fake successful response
-    mock.method(global, 'fetch', async (url, options) => {
+    mock.method(global, 'fetch', async (_url, _options) => {
       return {
         ok: true,
         json: async () => ({

@@ -76,7 +76,7 @@ describe('newtab.js DOM manipulation', () => {
     const body2 = notice.childNodes[0];
     assert.equal(body2.childNodes[0].textContent, "<img src=x onerror=alert(1)> ");
     assert.equal(body2.childNodes[1].textContent, "<script>alert(2)</script>");
-    assert.equal(body2.childNodes[1].dataset.action, '\">XSS');
+    assert.equal(body2.childNodes[1].dataset.action, '">XSS');
 
     // Ensure no HTML elements were created by accident
     assert.equal(notice.querySelector('img'), null);
@@ -1189,8 +1189,6 @@ describe('newtab.js DOM manipulation', () => {
   });
 
   describe('start', () => {
-    let mockStart;
-
     beforeEach(() => {
       window.chrome.storage.local.get = async () => ({
         settings: { postalcode: '12345' },

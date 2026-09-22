@@ -151,6 +151,8 @@ test("normalizer rejects cards with malformed or unsafe imageUrl", () => {
     }],
     included: [
       { id: "o", type: "orgs", attributes: { name: "Rescue" } },
+      // Inert test fixture -- asserting normalizeUrl() rejects this is the point of the test.
+      // eslint-disable-next-line no-script-url
       { id: "p1", type: "pictures", attributes: { order: 1, original: { url: "javascript:alert(1)" } } }
     ]
   });

@@ -78,8 +78,11 @@ Add a row here as part of every release PR — see [RELEASE.md](RELEASE.md).
 ## Validation
 
 ```powershell
+npm.cmd run lint
 npm.cmd test
 ```
+
+Both run in CI as part of the same required `test` check; a lint failure blocks merge exactly like a test failure. Linting is `eslint.config.js`, no separate config file per directory — it enforces `no-eval`/`no-implied-eval`/`no-new-func`/`no-script-url` repo-wide (see AGENTS.md's "Security-First Coding") on top of `eslint:recommended`, deliberately without a formatter (no Prettier) or stylistic rules beyond that.
 
 Run the live RescueGroups integration test once against the real API before merging any change to search radius, pagination, or the RescueGroups query contract, to confirm the pagination contract still holds. It requires a real `RG_API_KEY` (loaded from `.env`, same as `start:server`) and is excluded from `npm test`/CI by design:
 
