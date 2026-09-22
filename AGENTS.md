@@ -41,7 +41,7 @@ Do not modify these autonomously unless explicitly required:
 
 ## 2. Tabby Architecture & Project Directives
 
-Tabby consists of three directories with distinct roles. Scope your changes strictly to the relevant one.
+Tabby's top-level directories each have a distinct role. Scope your changes strictly to the relevant one.
 
 ### `/extension` (Chrome + Edge extension)
 - **Permissions:** `manifest.json`'s permissions array is exactly `["storage", "geolocation"]` — do not add a new permission without a corresponding justification in `webstore/WEBSTORE.md`'s Permissions Justification table, since the store review teams read that field directly.
@@ -56,6 +56,9 @@ Tabby consists of three directories with distinct roles. Scope your changes stri
 
 ### `/webstore` (Chrome Web Store + Edge Add-ons listing)
 - Holds `WEBSTORE.md` (listing copy, permissions justifications, screenshots/promo assets) and the screenshot-capture harnesses used to regenerate them. Not test-covered; update listing copy/screenshots here when a release changes what's visibly different to a user (see [RELEASE.md](RELEASE.md)).
+
+### `/benchmark` (manual perf-profiling scripts)
+- Ad hoc scripts that justify a past or prospective optimization with real numbers — not correctness tests, not run by `npm test`/CI, run manually (`node benchmark/<name>.js`). Keep a script only as long as it reflects something real in the live code; delete it (don't leave it as silent clutter) once the function it profiles is removed or rewritten, the way `benchmark.js` was removed here after the DOM-based HTML-escaping approach it profiled was replaced by textContent-only rendering.
 
 ---
 
