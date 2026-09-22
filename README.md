@@ -1,15 +1,16 @@
 # Tabby
 
-**[Get Tabby on the Chrome Web Store](https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig)**
+**[Get Tabby on the Chrome Web Store](https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig)** · **[Get Tabby on Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho)**
 
-Tabby is a Manifest V3 Chrome extension that replaces the new tab page with a nearby, photo-ready adoptable cat. It uses a cache-first UI and a small backend proxy so the RescueGroups public API key never ships in the extension.
+Tabby is a Manifest V3 extension (Chrome and Edge) that replaces the new tab page with a nearby, photo-ready adoptable cat. It uses a cache-first UI and a small backend proxy so the RescueGroups public API key never ships in the extension.
 
-## What is included
+## How Tabby works
 
-- New-tab UI with instant cached-card rendering and stale-while-revalidate refresh.
+- New-tab UI with instant cached-card rendering and stale-while-revalidate refresh: the last-fetched batch renders immediately from `chrome.storage.local`, and a background refresh only fires once the cache is at least 5 minutes old **and** the user has seen at least 85% of the cached cards — so a batch the user hasn't finished browsing isn't discarded early.
 - Browser-coordinate lookup with native postal-code fallback.
-- Server-side 25 -> 75 -> 150 -> 250 mile radius ladder, escalating on cumulative deduplicated results until 40 unique cats are found.
-- RescueGroups `available/cats/haspic` query, nearest-first sorting, picture validation, organization join, and safe profile-url fallback.
+- Server-side 25 -> 75 -> 150 -> 250 mile radius ladder: widens the radius, deduplicating by cat ID across steps, until at least 40 unique cats are accumulated or the 250-mile step is reached, whichever comes first — 40 is a floor, not a target. Whatever's accumulated is then capped at 100 cats (closest-first) before being sent to the extension.
+- RescueGroups `available/cats/haspic` query — only cats in "available" status with at least one photo are ever shown — plus nearest-first sorting, picture validation, organization join, and safe profile-url fallback.
+- Listings whose most recent update is more than a year old are filtered out server-side, so Tabby never surfaces an abandoned or long-stale listing.
 - Content-aware crop for portrait photos: a row-wise edge-energy heuristic finds the likely subject band instead of always anchoring to the top, via a small hostname-locked analysis-thumbnail proxy (`GET /api/photo-thumb`) that works around RescueGroups' CDN sending no CORS headers.
 - "Share this cat" via the Web Share API, attaching the actual photo (fetched through a second hostname-locked, share-sized proxy, `GET /api/photo-share`, for the same CORS reason as the crop analysis above) alongside the cat's details, a Tabby tagline, and its RescueGroups profile link. Degrades to a link-only native share if the photo can't be attached, and to a clipboard-copy if the platform has no Web Share API at all.
 - No third-party runtime dependencies; Node's built-in test runner.
@@ -41,6 +42,8 @@ Deploying the server is a separate step from packaging the extension; whatever h
 The in-memory cache is correct as-is for the intended deployment target: a single persistent Node process (for example Render, Railway, Fly.io, or Northflank). It would need to be replaced with a shared cache (for example KV/Redis) only if the server is ever scaled to multiple concurrent instances, or moved to a serverless/edge platform (Vercel functions, Cloudflare Workers) where in-process state isn't reliably shared or persistent between requests — those platforms would also require restructuring `server/index.js` away from its current `node:http` `createServer` model.
 
 `/api/nearby-cats` is also rate-limited per client IP (30 requests / 5 minutes, in-memory, same deployment assumption as the cache above) — a cache miss costs a real RescueGroups API call, so this bounds how much a script varying postal codes/coordinates can cost regardless of the response cache. The client IP is taken from `X-Forwarded-For` when present (Northflank and similar platforms terminate the real connection and forward, so `request.socket.remoteAddress` alone would otherwise be the platform's internal proxy address for every request), falling back to the raw socket address only when that header is absent, as in local dev. If a future host doesn't set `X-Forwarded-For` in front of this server, every request would be seen as one shared IP.
+
+- `ALERT_WEBHOOK_URL` — optional. When set, the server posts a Discord-compatible webhook message (a JSON body with a `content` field) whenever upstream RescueGroups failures spike: 5+ failures within a rolling 10-minute window, with a 30-minute cooldown between alerts so a sustained outage doesn't spam the channel. Left unset, alerting is a no-op — this exists because a real RescueGroups connectivity incident once went undetected for hours with errors only reaching server logs.
 
 Once the server has a real HTTPS URL, package the extension with:
 
