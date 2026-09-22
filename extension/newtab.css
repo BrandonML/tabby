@@ -109,9 +109,10 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 
 /* Overlaid on the photo itself (issues #40/#44) -- solid pills, distinct
    from the outlined .chip row below the photo, so they read as a callout
-   rather than blending into the metadata. Stacked vertically so both can
-   show at once (e.g. a senior cat newly available) without crowding. */
-.badges { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+   rather than blending into the metadata. Laid out side by side (both
+   anchored to the photo's top-left) so both can show at once (e.g. a
+   senior cat newly available) without crowding. */
+.badges { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: row; align-items: center; gap: 6px; }
 .badge {
   font-family: var(--font-mono);
   font-size: 10.5px;
