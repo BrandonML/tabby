@@ -11,6 +11,7 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 - [ ] Default: open a pull request straight from the feature branch into `main` — don't merge locally and push. Going through a PR is what lets the ruleset above actually gate the merge on CI passing (a direct push of an untested commit is rejected outright, since it can never satisfy the required check). The ruleset gates on the *target* branch (`main`) requiring a PR + a green `test` check — it doesn't care what the source branch is named, so there's no need to create a `dev` branch just to have one.
 - [ ] Exception: if several feature branches are ready to ship together, merge them all into a shared `dev` branch first, then open one PR from `dev` into `main`. Use this only when bundling multiple branches — a single feature branch goes straight to `main`.
 - [ ] Bump `manifest.json`/`package.json` to the new version and add a row to [README.md](README.md)'s Version History table, as a commit on the same branch/PR — this is what `tag-release.yml` reads post-merge, so it needs to land in the same merge as the change it describes rather than as a follow-up.
+- [ ] Documentation currency check (see AGENTS.md's "Documentation & Asset Currency"): does this release make README.md, this file, or `webstore/WEBSTORE.md` (copy or screenshots/promo assets) inaccurate? Fix small stuff directly in this PR. For a larger asset-generation task (e.g. regenerating screenshots), don't block the release on it — file a tracking issue instead and note it in the PR description, the way [issue #66](https://github.com/BrandonML/tabby/issues/66) tracks the icon-menu change making the screenshot harness stale.
 - [ ] Wait for the `test` check to go green. If it's red, stop — do not merge.
 - [ ] Merge the PR.
 
@@ -22,9 +23,9 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 ## 4. Store submission (manual — both stores require a human in their dashboard)
 
 - [ ] Build the release zip: `npm run release <version> https://p01--tabby--bklqdgzwx4md.code.run`
+- [ ] Double-check [webstore/WEBSTORE.md](webstore/WEBSTORE.md)'s listing copy and screenshots match what's about to ship — this should already be handled by the §2 documentation currency check, this is just the last look before it's public.
 - [ ] Upload `dist/v<version>.zip` to the Chrome Web Store dashboard, submit for review.
 - [ ] Upload the same zip to the Edge Add-ons dashboard, submit for review.
-- [ ] Update listing copy/screenshots in [webstore/WEBSTORE.md](webstore/WEBSTORE.md) if the release changes what's visibly different to a user.
 
 ## If a release fails
 
