@@ -860,7 +860,17 @@ function openSettings() {
   });
 }
 
+function openFaq() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+    if (tab?.id) {
+      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("extension/faq.html") });
+    }
+  });
+}
+
 $("settings").addEventListener("click", openSettings);
+$("faq").addEventListener("click", openFaq);
 $("use-location").addEventListener("click", async () => {
   $("location-panel").hidden = true;
   showNotice("Finding your location…");

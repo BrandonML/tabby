@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tabby FAQ</title><link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png"><link rel="icon" type="image/png" sizes="32x32" href="icons/icon32.png"><link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="newtab.css"></head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="eyebrow">TABBY FAQ</p>
+        <button id="back-to-tabby" class="icon-btn" type="button" aria-label="Back to Tabby" title="Back to Tabby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+      </header>
+      <section class="location-panel faq-panel">
+        <h1>Frequently asked questions</h1>
+        <p class="panel-sub">Answers to what we hear most. Still stuck? <a href="mailto:bscivolette@gmail.com">Email us</a> or <a href="https://github.com/BrandonML/tabby/issues" target="_blank" rel="noopener noreferrer">open an issue</a>.</p>
+
+        <div class="faq-section">
+          <h2>Getting started</h2>
+          <details class="faq-item">
+            <summary>I see a warning that Tabby is trying to change my browser settings. What should I do?</summary>
+            <p>That's normal — it's your browser protecting you from unwanted new-tab hijacks. Go ahead and allow it; once you do, Tabby will show a new cat every time you open a new tab.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Do I have to share my location?</summary>
+            <p>Tabby needs some location to search from, but it doesn't have to be your real one — you can enter any valid ZIP code instead of using "Use my location," even one that isn't yours.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>How Tabby finds cats</h2>
+          <details class="faq-item">
+            <summary>Does Tabby show all adoptable cats in my area?</summary>
+            <p>No — Tabby only shows cats from organizations that use RescueGroups. Adoptable-pet data isn't centralized across shelters and rescues industry-wide, and the two largest platforms besides RescueGroups are both closed, so we can't pull from them either.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What if there aren't many cats near me?</summary>
+            <p>Tabby automatically widens its search up to 250 miles for areas with fewer listings. If you're still not seeing much, try Explore to browse other cities, or enter a different ZIP code.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How does Tabby decide which cat to show, and will I see repeats?</summary>
+            <p>Tabby pulls the closest available cats first and keeps track of which ones you've already seen. Once you've seen most of what's cached, it quietly pulls more — expanding the search radius if needed — and filters out repeats. Once you've worked through everything nearby, Tabby starts back over from the closest cats, same as when you first installed it or changed your location.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why am I seeing cats that haven't been updated in a while?</summary>
+            <p>We only show cats marked "available," so every cat you see is still up for adoption regardless of when its listing was last touched. Some organizations just don't update their RescueGroups listings often. We currently allow listings up to a year old — we'd like to tighten that window down the road, but a stricter cutoff means showing fewer cats today.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>Cat details</h2>
+          <details class="faq-item">
+            <summary>What do the "New" and "Senior" badges mean?</summary>
+            <p>"New" means the cat's listing looks recently added, and "Senior" means the cat is roughly 10 years or older. Both come from optional fields in RescueGroups' data, so not every organization provides what's needed to evaluate them — when that information is missing, we simply don't show a badge rather than guessing.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why do some photos not display correctly?</summary>
+            <p>Organizations upload their own photos with no size or aspect-ratio restrictions, and we resize them dynamically to fit. It mostly works, but occasionally an image won't display quite right.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why does the profile or rescue link sometimes go to the wrong place?</summary>
+            <p>Everything Tabby shows comes directly from the organization's RescueGroups account. Usually the link takes you straight to the cat's profile or the org's site. Occasionally an org's account isn't configured to link directly, or their website changed and RescueGroups wasn't updated, so the link may land on the org's homepage instead — from there you should be able to find the cat.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why doesn't every cat show all its details (age, sex, fee, etc.)?</summary>
+            <p>RescueGroups doesn't require organizations to fill in most fields, so some just don't. If a detail is missing, it's because the organization didn't provide it, not a bug on our end.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>Using Tabby</h2>
+          <details class="faq-item">
+            <summary>How do I adopt a cat I see on Tabby?</summary>
+            <p>Click through to the cat or organization's site. Every organization handles adoptions differently, but they'll have their own application process listed there.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do I change my location?</summary>
+            <p>Open Settings and either click "Use my location" or enter a ZIP code. Explore is separate and temporary — it lets you browse a random city, but your next new tab goes back to whatever's set in Settings.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do I share a cat with a friend?</summary>
+            <p>Click the share icon on any cat card. You can send it via text, email, or social media, or just copy the link.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Is Tabby free?</summary>
+            <p>Yes, completely. No ads, no trackers, no premium tier.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>Compatibility</h2>
+          <details class="faq-item">
+            <summary>Can I use Tabby on my phone?</summary>
+            <p>Tabby is a browser extension, not an app, so it's only available on desktop and laptop browsers.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I use Tabby on Safari?</summary>
+            <p>Not currently. Safari's extension requirements differ substantially from Chrome's and Edge's. Tabby is available on Chrome and Edge for now.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>Privacy</h2>
+          <details class="faq-item">
+            <summary>Is my location shared with anyone?</summary>
+            <p>Your location or ZIP code is sent to our backend solely to search RescueGroups for nearby cats. We don't sell it or share it with advertisers or analytics providers.</p>
+          </details>
+        </div>
+
+        <div class="faq-section">
+          <h2>Support</h2>
+          <details class="faq-item">
+            <summary>How do I report a bug or suggest a feature?</summary>
+            <p>Open an issue on the <a href="https://github.com/BrandonML/tabby/issues" target="_blank" rel="noopener noreferrer">Tabby GitHub page</a>, or <a href="mailto:bscivolette@gmail.com">send an email</a>.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="faq.js"></script>
+  </body>
+</html>

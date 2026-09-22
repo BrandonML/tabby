@@ -603,6 +603,27 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(openedOptionsPage, true);
     });
   });
+  describe('FAQ button', () => {
+    it('#faq replaces the current tab with the FAQ page', () => {
+      let updatedTabId, updatedProps;
+      window.chrome.tabs.update = (tabId, props) => { updatedTabId = tabId; updatedProps = props; };
+
+      document.getElementById("faq").click();
+
+      assert.equal(updatedTabId, 1);
+      assert.equal(updatedProps.url, "chrome-extension://fake-id/extension/faq.html");
+    });
+
+    it('does nothing when there is no active tab to replace', () => {
+      window.chrome.tabs.query = (_query, callback) => callback([]);
+      let updateCalled = false;
+      window.chrome.tabs.update = () => { updateCalled = true; };
+
+      document.getElementById("faq").click();
+
+      assert.equal(updateCalled, false);
+    });
+  });
   describe('renderCard location label (normal mode)', () => {
     it('shows the saved ZIP as the distance basis when locationLabel is "from <zip>"', () => {
       window.renderCard({ name: "Milo", distanceMiles: 5.5 }, { locationLabel: "from 97703" });
