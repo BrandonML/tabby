@@ -308,6 +308,15 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   const badges = [card.isNew && { label: "New", className: "new" }, card.isSenior && { label: "Senior", className: "senior" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
   const profileUrl = card.profileUrl;
+  // Issue #51: ~85% of orgs don't configure a per-animal profile URL, so
+  // rescueUrl and profileUrl end up pointing at the exact same page (either
+  // because rescueUrl's own fallback above kicks in, or because the org's
+  // "animal profile" URL RescueGroups hands back is just its own homepage).
+  // Showing two links to the same destination reads as a mistake, not a
+  // feature -- when they match, "View profile" (the styled action button,
+  // already what feeds the share flow) stays as the one link, and the
+  // rescue name above it drops back to plain text.
+  const showRescueLink = Boolean(rescueUrl) && rescueUrl !== profileUrl;
 
   const cardContainer = $("card");
   cardContainer.className = "card";
@@ -411,7 +420,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
 
   const rescueP = document.createElement("p");
   rescueP.className = "rescue";
-  if (rescueUrl) {
+  if (showRescueLink) {
     const rescueA = document.createElement("a");
     rescueA.href = rescueUrl;
     rescueA.target = "_blank";

@@ -166,6 +166,72 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(card.querySelectorAll('.badges').length, 0);
   });
 
+  describe('rescue/profile link redundancy (issue #51)', () => {
+    it('drops the rescue-name link and keeps only View profile when both URLs match', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: "https://rescue.org",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueP = card.querySelector('.rescue');
+      assert.equal(rescueP.querySelector('a'), null, 'rescue name should render as plain text');
+      assert.equal(rescueP.textContent, "Second Chance Rescue");
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA, 'View profile button should still render');
+      assert.equal(profileA.href, "https://rescue.org/");
+    });
+
+    it('drops the rescue-name link when profileUrl is missing and rescueUrl falls back to it (both empty)', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: null,
+        profileUrl: "https://rescue.org",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueP = card.querySelector('.rescue');
+      assert.equal(rescueP.querySelector('a'), null, 'rescueUrl falling back to profileUrl makes them identical -- no separate link');
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA);
+      assert.equal(profileA.href, "https://rescue.org/");
+    });
+
+    it('shows both links when rescueUrl and profileUrl genuinely differ', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: "https://rescue.rescuegroups.org/animals/detail?AnimalID=123",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueA = card.querySelector('.rescue a');
+      assert.ok(rescueA, 'rescue name should still link when the URLs differ');
+      assert.equal(rescueA.href, "https://rescue.org/");
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA);
+      assert.equal(profileA.href, "https://rescue.rescuegroups.org/animals/detail?AnimalID=123");
+    });
+
+    it('shows the rescue-name link on its own when there is no profileUrl at all', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: null,
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueA = card.querySelector('.rescue a');
+      assert.ok(rescueA);
+      assert.equal(card.querySelector('.profile'), null, 'no View profile button without a profileUrl');
+    });
+  });
+
   describe('renderCard long-name handling', () => {
     it('adds the name-long modifier once the name passes 18 characters', () => {
       window.renderCard({ name: "Sir Reginald Fluffington III" });
