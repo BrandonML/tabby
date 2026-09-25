@@ -123,7 +123,10 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
   border: 1px solid var(--card-edge);
   border-radius: 8px;
 }
-.photo-portrait-mild { height: min(50vh, 420px); object-position: top; }
+/* Height bumped from 420 to 460 (issue #64) alongside the mild/tall ratio
+   cutoff moving down to 1.3 in newtab.js -- the old 420px box was cropping
+   34-46% of a mild-portrait photo's height off the bottom. */
+.photo-portrait-mild { height: min(55vh, 460px); object-position: top; }
 .photo-portrait { height: min(65vh, 560px); object-position: top; }
 
 /* Overlaid on the photo itself (issues #40/#44) -- solid pills, distinct
