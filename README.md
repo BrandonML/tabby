@@ -79,6 +79,7 @@ To manually smoke-test the unpacked extension against a real deployed backend (a
 | 2.1.0 | 2026-09-14 | Custom "Share via" menu (WhatsApp, Email, X/Twitter, Facebook, Reddit, Pinterest, Nextdoor, Copy link) replacing the single native-share-only button |
 | 2.2.0 | 2026-09-18 | Design polish: settings panel spacing + floating-label ZIP/Save input group (#30), tagline moved beside the wordmark (#25), dropped the un-loaded Inter font (#42), focus-visible rings and hover transitions, ZIP field now filters non-digit input as you type |
 | 2.3.0 | 2026-09-22 | "New" and "Senior" badges overlaid on cat cards (#40, #44); header menu (Explore/FAQ/Settings) and the settings-close control switched from text to icon buttons (#55); new FAQ page linked from the header (#50) |
+| 2.4.0 | 2026-09-25 | Settings save button height and FAQ heading/question font styling fixed (#68); `photo-portrait-mild` crop threshold recalibrated against real photo dimensions (#64); "Save cats" heart toggle + Saved cats page with a click-to-enlarge lightbox (#43); single "View profile" link instead of a redundant duplicate when the rescue and profile URLs match (#51); offline-specific notice instead of a misleading one when there's no internet (#69); webstore screenshot harness now fetches real markup instead of a hand copy, and all 6 screenshots regenerated (#66) |
 
 Add a row here as part of every release PR — see [RELEASE.md](RELEASE.md).
 
