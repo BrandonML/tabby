@@ -371,6 +371,15 @@ function setSaveButtonState(button, card, saved) {
   button.querySelector("svg").setAttribute("fill", saved ? "currentColor" : "none");
 }
 
+// Header "Saved cats" icon recolors (via currentColor, not a filled heart --
+// see .icon-btn.has-saved in newtab.css) once there's at least one saved
+// cat, so there's a passive hint the list isn't empty without implying the
+// nav icon itself is a toggle.
+async function updateSavedHeaderIndicator() {
+  const savedCats = await getSavedCats();
+  $("saved").classList.toggle("has-saved", savedCats.length > 0);
+}
+
 function buildSaveButton(card) {
   const button = document.createElement("button");
   button.type = "button";
@@ -382,6 +391,7 @@ function buildSaveButton(card) {
     button.disabled = true;
     const saved = await toggleSaveCard(card);
     setSaveButtonState(button, card, saved);
+    updateSavedHeaderIndicator();
     button.disabled = false;
   });
   return button;
@@ -1032,3 +1042,4 @@ $("back-to-my-area").addEventListener("click", async () => {
   await start();
 });
 start();
+updateSavedHeaderIndicator();

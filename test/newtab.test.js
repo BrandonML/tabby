@@ -345,6 +345,37 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(saveBtn.getAttribute('aria-pressed'), 'false', 'save should not appear to have succeeded');
       assert.ok(document.getElementById('notice').textContent.includes("Couldn't update"));
     });
+
+    describe('header "Saved cats" indicator', () => {
+      it('has no has-saved class when there are no saved cats', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [] });
+        await window.updateSavedHeaderIndicator();
+
+        assert.equal(document.getElementById('saved').classList.contains('has-saved'), false);
+      });
+
+      it('gets the has-saved class once there is at least one saved cat', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-9', name: 'Other' }] });
+        await window.updateSavedHeaderIndicator();
+
+        assert.ok(document.getElementById('saved').classList.contains('has-saved'));
+      });
+
+      it('turns on after saving a cat from the card, and off again after unsaving it', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [] });
+        window.chrome.storage.local.set = async (val) => { window.chrome.storage.local.get = async () => val; };
+        window.renderCard(cardData);
+        await new Promise(r => setTimeout(r, 10));
+
+        document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+        await new Promise(r => setTimeout(r, 10));
+        assert.ok(document.getElementById('saved').classList.contains('has-saved'), 'should turn on after saving');
+
+        document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+        await new Promise(r => setTimeout(r, 10));
+        assert.equal(document.getElementById('saved').classList.contains('has-saved'), false, 'should turn back off after unsaving the only saved cat');
+      });
+    });
   });
 
   describe('renderCard long-name handling', () => {

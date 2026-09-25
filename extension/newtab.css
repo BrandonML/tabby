@@ -81,6 +81,12 @@ button:hover { background: var(--moss-dark); }
 .icon-btn:hover { background: var(--wall); }
 .icon-btn svg { width: 18px; height: 18px; }
 
+/* Signals at least one saved cat exists (issue #43 follow-up) -- just a
+   stroke-color change via currentColor, not a filled/solid heart, so the
+   header icon doesn't start looking like a pressed toggle (it isn't one;
+   it always just navigates to the Saved cats page). */
+.icon-btn.has-saved { color: var(--stamp); }
+
 h1 { margin: 0; font-weight: 700; color: var(--ink); }
 
 .card {
