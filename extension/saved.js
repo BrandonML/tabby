@@ -90,7 +90,9 @@ function buildSavedItem(saved) {
   const photoBtn = document.createElement("button");
   photoBtn.type = "button";
   photoBtn.className = "saved-item-photo-btn";
-  photoBtn.setAttribute("aria-label", `View larger photo of ${saved.name}`);
+  const photoHint = `Click to see a larger photo of ${saved.name}`;
+  photoBtn.setAttribute("aria-label", photoHint);
+  photoBtn.title = photoHint;
   const img = document.createElement("img");
   img.className = "saved-item-photo";
   img.src = saved.imageUrl;
