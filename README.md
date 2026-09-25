@@ -14,7 +14,12 @@ Tabby is a Manifest V3 extension (Chrome and Edge) that replaces the new tab pag
 - "New" and "Senior" badges are computed server-side from optional RescueGroups fields — `availableDate` (with an adopted-then-returned branch keyed on `adoptedDate`) for New, `birthDate` with an `ageGroup` fallback for Senior. When the field an org needs isn't populated, that cat is simply excluded from the badge's evaluation rather than guessed at.
 - Content-aware crop for portrait photos: a row-wise edge-energy heuristic finds the likely subject band instead of always anchoring to the top, via a small hostname-locked analysis-thumbnail proxy (`GET /api/photo-thumb`) that works around RescueGroups' CDN sending no CORS headers.
 - "Share this cat" via the Web Share API, attaching the actual photo (fetched through a second hostname-locked, share-sized proxy, `GET /api/photo-share`, for the same CORS reason as the crop analysis above) alongside the cat's details, a Tabby tagline, and its RescueGroups profile link. Degrades to a link-only native share if the photo can't be attached, and to a clipboard-copy if the platform has no Web Share API at all.
+- Save a cat via the heart icon on its photo: stores a snapshot (name, photo, rescue/profile links, etc.) in `chrome.storage.local`, not `.sync` — see the "Saved cats storage" note below for why — so a saved card still renders on the dedicated Saved cats page (`extension/saved.html`) even after the cat is adopted or drops out of the regular feed.
 - No third-party runtime dependencies; Node's built-in test runner.
+
+### Saved cats storage (issue #43)
+
+Saved cats persist via `chrome.storage.local`, not `chrome.storage.sync`. Sync would survive an uninstall or follow the user to a new device, which is a better fit for "save something to revisit indefinitely" — but `webstore/WEBSTORE.md`'s Permissions Justification table explicitly promises Chrome Web Store reviewers that Tabby's `storage` permission never uses `chrome.storage.sync` and that nothing is synced to Google's servers. Switching to sync would mean deliberately rewriting that reviewed privacy claim, not just a code change, so for now saved cats stay local-only. Revisit if cross-device persistence becomes a real ask.
 
 ## Run locally
 

@@ -152,6 +152,33 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 .badge.new { background: var(--moss); }
 .badge.senior { background: var(--stamp); }
 
+/* Save toggle (issue #43) -- mirrors .badges' overlay positioning but
+   anchored top-right instead, so it never collides with the New/Senior
+   badges at top-left. A solid translucent circle (rather than a bare icon)
+   keeps the heart legible against photos of any brightness, same reasoning
+   as the badge pills. */
+.save-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(42, 38, 32, 0.45);
+  color: var(--paper);
+  cursor: pointer;
+}
+.save-btn svg { width: 18px; height: 18px; }
+.save-btn:hover { background: rgba(42, 38, 32, 0.6); }
+.save-btn.saved { color: var(--stamp); background: var(--paper); }
+.save-btn.saved:hover { background: var(--paper); }
+
 .content { padding: 16px 22px 22px; }
 
 .name {
@@ -437,6 +464,40 @@ input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px
 }
 .faq-item[open] summary::after { transform: rotate(45deg); }
 .faq-item p { margin: 0 2px 14px; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+
+/* Saved cats page (issue #43) */
+.saved-list { display: flex; flex-direction: column; gap: 14px; }
+.saved-item {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  padding: 10px;
+}
+.saved-item-photo {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--wall);
+  flex-shrink: 0;
+}
+.saved-item-info { flex: 1 1 auto; min-width: 0; }
+.saved-item-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; margin: 0; }
+.saved-item-meta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-soft); margin: 2px 0 0; }
+.saved-item-links { margin: 4px 0 0; font-size: 0.8125rem; }
+.saved-item-links a { color: var(--moss-dark); text-decoration: underline; text-underline-offset: 2px; }
+.saved-item-remove {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--stamp);
+  border: 1.5px solid var(--stamp);
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  border-radius: 8px;
+}
+.saved-item-remove:hover { background: var(--stamp); color: var(--paper); }
 
 .footer {
   margin-top: 32px;

@@ -103,6 +103,56 @@ const EXPLORE_LOCATIONS = [
 
 function storageGet(keys) { return chrome.storage.local.get(keys); }
 function storageSet(value) { return chrome.storage.local.set(value); }
+
+// Issue #43: saved cats persist via chrome.storage.local (not .sync) --
+// WEBSTORE.md's permissions justification explicitly tells reviewers Tabby
+// never syncs data to Google's servers, and changing that is a real
+// privacy-posture decision, not just a code choice. See GitHub issue #43
+// for that trade-off (sync would survive an uninstall/new device, local
+// doesn't) if this ever needs revisiting. A snapshot is stored at save time
+// rather than just the id, since a saved cat can be adopted or delisted
+// later and the saved list should still show something for it.
+async function getSavedCats() {
+  const { savedCats } = await storageGet(["savedCats"]);
+  return Array.isArray(savedCats) ? savedCats : [];
+}
+
+function isCardSaved(id, savedCats) {
+  return savedCats.some((saved) => saved.id === id);
+}
+
+function snapshotForSave(card) {
+  return {
+    id: card.id,
+    name: card.name,
+    breed: card.breed || null,
+    age: card.age || null,
+    sex: card.sex || null,
+    imageUrl: card.imageUrl,
+    rescueName: card.rescueName,
+    rescueUrl: card.rescueUrl || null,
+    profileUrl: card.profileUrl || null,
+    adoptionFee: card.adoptionFee || null,
+    savedAt: new Date().toISOString()
+  };
+}
+
+// Returns the new saved state (true = now saved) so the caller can update
+// the toggle button without a second read.
+async function toggleSaveCard(card) {
+  const savedCats = await getSavedCats();
+  const existingIndex = savedCats.findIndex((saved) => saved.id === card.id);
+  const nextSaved = existingIndex < 0 ? [...savedCats, snapshotForSave(card)] : savedCats.filter((_, i) => i !== existingIndex);
+  try {
+    await storageSet({ savedCats: nextSaved });
+  } catch (error) {
+    console.error("[tabby]", error);
+    showNotice("Couldn't update your saved cats right now. Try again.", { type: "error" });
+    return existingIndex >= 0; // unchanged
+  }
+  return existingIndex < 0;
+}
+
 function randomCard(cards) { return cards[Math.floor(Math.random() * cards.length)]; }
 function setCardVisible(visible) {
   const card = $("card");
@@ -289,6 +339,53 @@ function getSeenIds(feedCache) {
   return Array.isArray(feedCache?.seenIds) ? feedCache.seenIds : [];
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+// Same heart glyph as the header's "Saved cats" icon-btn (extension/newtab.html)
+// -- built via the DOM rather than innerHTML to match this file's "no
+// innerHTML" convention (see renderCard's "Clear securely" comment), even
+// though this particular markup is static, not user data.
+const HEART_PATH_D = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
+
+function buildHeartIcon() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", HEART_PATH_D);
+  svg.appendChild(path);
+  return svg;
+}
+
+function setSaveButtonState(button, card, saved) {
+  button.setAttribute("aria-pressed", String(saved));
+  const label = saved ? `Unsave ${card.name}` : `Save ${card.name}`;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  button.classList.toggle("saved", saved);
+  button.querySelector("svg").setAttribute("fill", saved ? "currentColor" : "none");
+}
+
+function buildSaveButton(card) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "save-btn";
+  button.appendChild(buildHeartIcon());
+  setSaveButtonState(button, card, false);
+  getSavedCats().then((savedCats) => setSaveButtonState(button, card, isCardSaved(card.id, savedCats)));
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    const saved = await toggleSaveCard(card);
+    setSaveButtonState(button, card, saved);
+    button.disabled = false;
+  });
+  return button;
+}
+
 function nextCard(cards, seenIds = []) {
   const seenSet = new Set(seenIds);
   const unseenCards = cards.filter((card) => !seenSet.has(card.id));
@@ -374,6 +471,8 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     }
     photoFrame.appendChild(badgesDiv);
   }
+
+  photoFrame.appendChild(buildSaveButton(card));
 
   cardContainer.appendChild(photoFrame);
 
@@ -906,8 +1005,18 @@ function openFaq() {
   });
 }
 
+function openSaved() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+    if (tab?.id) {
+      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("extension/saved.html") });
+    }
+  });
+}
+
 $("settings").addEventListener("click", openSettings);
 $("faq").addEventListener("click", openFaq);
+$("saved").addEventListener("click", openSaved);
 $("use-location").addEventListener("click", async () => {
   $("location-panel").hidden = true;
   showNotice("Finding your location…");

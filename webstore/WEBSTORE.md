@@ -43,6 +43,7 @@ FEATURES
 • One cat, front and center — name, breed, age, sex, adoption fee, and how recently the listing was updated, plus a direct link to the cat's full profile and the rescue organization.
 • Adoption-pending and special-needs cats are clearly flagged, so you know a cat's status before reaching out.
 • "Explore another area" lets you browse adoptable cats in other major U.S. cities, even if you're not planning to adopt locally.
+• Save a cat with the heart icon to find it again later, even after it's adopted or drops out of your regular feed.
 • Fast and quiet — Tabby shows your last cat instantly from a local cache and refreshes in the background, so opening a new tab never feels slow.
 
 HOW TO USE
@@ -106,7 +107,7 @@ All screenshots use the real `extension/newtab.css`/`newtab.js`/`options.js` unm
 
 | Permission | Type | Justification |
 |------------|------|----------------|
-| `storage` | permissions | The storage permission lets Tabby save the user's chosen location (ZIP code or geolocation coordinates) and the most recently fetched batch of adoptable-cat listings locally on the device, via `chrome.storage.local` (never `chrome.storage.sync`). This is what lets the new tab page render instantly from a local cache instead of re-fetching from the network on every tab open, and lets Tabby remember which cats the user has already seen so repeat refreshes surface new cats first. No data stored via this permission is synced to Google's servers or shared with any third party. |
+| `storage` | permissions | The storage permission lets Tabby save the user's chosen location (ZIP code or geolocation coordinates), the most recently fetched batch of adoptable-cat listings, and any cats the user has explicitly saved via the heart icon, all locally on the device via `chrome.storage.local` (never `chrome.storage.sync`). This is what lets the new tab page render instantly from a local cache instead of re-fetching from the network on every tab open, lets Tabby remember which cats the user has already seen so repeat refreshes surface new cats first, and lets a saved cat's card persist for later even if it's later adopted or removed from the live feed. No data stored via this permission is synced to Google's servers or shared with any third party. |
 | `geolocation` | permissions | The geolocation permission is used only when the user explicitly clicks "Use my location," either on first run or in Settings. It triggers Chrome's native location permission prompt; if the user allows it, Tabby reads the device's coordinates once to search RescueGroups.org for adoptable cats near that location, sending only those coordinates (never any other browser or device data) to Tabby's own backend to perform the search. Users can decline and enter a five-digit ZIP code instead — geolocation is never required for the extension to work. |
 
 <!-- ⚠️ The task brief for this document asked for "activeTab" and "scripting" justifications,
