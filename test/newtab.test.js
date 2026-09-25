@@ -232,6 +232,28 @@ describe('newtab.js DOM manipulation', () => {
     });
   });
 
+  describe('photo load failure (issue #69)', () => {
+    it('shows the generic "photo unavailable" notice when the image fails to load while online', () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+
+      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('shows an offline-specific notice when the image fails to load while offline', () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+
+      const noticeText = document.getElementById('notice').textContent;
+      assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
+      assert.ok(!noticeText.includes('no longer available'), 'should not show the generic missing-photo message while offline');
+    });
+  });
+
   describe('renderCard long-name handling', () => {
     it('adds the name-long modifier once the name passes 18 characters', () => {
       window.renderCard({ name: "Sir Reginald Fluffington III" });
@@ -1585,6 +1607,18 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(link.textContent, 'zip code');
     });
 
+    it('shows an offline-specific notice (no report-issue/zip links) when refresh fails while offline', async () => {
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      window.console.error = () => {};
+
+      await window.start();
+
+      const notice = document.getElementById("notice");
+      assert.ok(notice.textContent.includes("offline"), `expected an offline-specific notice, got: ${notice.textContent}`);
+      assert.equal(notice.querySelector('.notice-link'), null, 'offline notice should not offer a report-issue or zip-code shortcut');
+    });
+
     it('prevents multiple concurrent executions', async () => {
       const p1 = window.start();
       const p2 = window.start();
@@ -1686,6 +1720,18 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(loggedErrors.length, 1);
       assert.equal(loggedErrors[0][0], '[tabby]');
       assert.ok(document.getElementById('notice').textContent.length > 0);
+    });
+
+    it('shows an offline-specific notice when the explore fetch fails while offline', async () => {
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      window.console.error = () => {};
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      const noticeText = document.getElementById('notice').textContent;
+      assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
     });
 
     it('shows the distance relative to the explored city, not the user, while exploring', async () => {

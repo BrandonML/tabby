@@ -42,6 +42,14 @@ const TALL_PORTRAIT_HEIGHT_RATIO = 1.3;
 const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 const PHOTO_SHARE_TIMEOUT_MS = 6000;
+// Issue #69: a network failure (photo load, refresh, or explore) previously
+// surfaced the same message it would for an unrelated cause (a removed
+// photo, a bad ZIP), which is actively misleading when the real problem is
+// just "no internet". navigator.onLine is a reliable true-negative signal
+// -- it can't be true while genuinely offline -- so it's checked first and
+// gets its own message; a false "online" reading just falls through to the
+// existing per-context error handling unchanged.
+const OFFLINE_MESSAGE = "You're offline. Reconnect and refresh to keep browsing cats.";
 const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
 const TABBY_EDGE_URL = "https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho";
 const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
@@ -331,7 +339,10 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   img.src = card.imageUrl;
   img.alt = card.name;
   img.referrerPolicy = "no-referrer";
-  img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat.", { type: "error" }); });
+  img.addEventListener("error", () => {
+    const message = navigator.onLine === false ? OFFLINE_MESSAGE : "That photo is no longer available. Refresh to try another cat.";
+    showNotice(message, { type: "error" });
+  });
   img.addEventListener("load", () => {
     // A portrait-oriented photo (taller than wide) can't fill the card's
     // full width without either cropping or shrinking down to fit beside
@@ -801,14 +812,18 @@ async function _start({ requestLocation = false } = {}) {
   if (shouldRefresh) {
     try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
-      const finalMessage = classifyRefreshError(error.message);
-      // A ZIP-validation failure already carries enough detail to know it's
-      // a user issue, so it keeps the settings shortcut instead — the
-      // report-issue link is for failures that might actually be our bug.
-      const noticeOptions = isInvalidZipError(error.message)
-        ? { links: [ZIP_SETTINGS_LINK], type: "error" }
-        : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
-      showNotice(finalMessage, noticeOptions);
+      if (navigator.onLine === false) {
+        showNotice(OFFLINE_MESSAGE, { type: "error" });
+      } else {
+        const finalMessage = classifyRefreshError(error.message);
+        // A ZIP-validation failure already carries enough detail to know it's
+        // a user issue, so it keeps the settings shortcut instead — the
+        // report-issue link is for failures that might actually be our bug.
+        const noticeOptions = isInvalidZipError(error.message)
+          ? { links: [ZIP_SETTINGS_LINK], type: "error" }
+          : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
+        showNotice(finalMessage, noticeOptions);
+      }
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }
@@ -855,7 +870,7 @@ async function exploreArea() {
     console.error("[tabby]", error);
     exploreBatch = null;
     hideExploreBanner();
-    showNotice("Unable to explore that area right now. Try again.", { type: "error" });
+    showNotice(navigator.onLine === false ? OFFLINE_MESSAGE : "Unable to explore that area right now. Try again.", { type: "error" });
   }
 }
 
