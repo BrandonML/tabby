@@ -254,6 +254,97 @@ describe('newtab.js DOM manipulation', () => {
     });
   });
 
+  describe('Save cats (issue #43)', () => {
+    const cardData = {
+      id: 'cat-1',
+      name: 'Milo',
+      breed: 'Tabby',
+      age: 'Adult',
+      sex: 'Male',
+      rescueName: 'Second Chance Rescue',
+      rescueUrl: 'https://rescue.org',
+      profileUrl: 'https://rescue.org/animals/milo',
+      adoptionFee: '$50',
+      imageUrl: 'https://image.org/cat.jpg'
+    };
+
+    it('renders unsaved by default when the cat is not in savedCats', async () => {
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.ok(saveBtn);
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false');
+      assert.equal(saveBtn.classList.contains('saved'), false);
+      assert.equal(saveBtn.querySelector('svg').getAttribute('fill'), 'none');
+    });
+
+    it('renders as already-saved when the cat is already in savedCats', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-1', name: 'Milo' }] });
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'true');
+      assert.ok(saveBtn.classList.contains('saved'));
+      assert.equal(saveBtn.querySelector('svg').getAttribute('fill'), 'currentColor');
+    });
+
+    it('saves a snapshot of the cat to chrome.storage.local on click', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [] });
+      let setPayload;
+      window.chrome.storage.local.set = async (val) => { setPayload = val; };
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(setPayload.savedCats.length, 1);
+      const saved = setPayload.savedCats[0];
+      assert.equal(saved.id, 'cat-1');
+      assert.equal(saved.name, 'Milo');
+      assert.equal(saved.breed, 'Tabby');
+      assert.equal(saved.profileUrl, 'https://rescue.org/animals/milo');
+      assert.ok(saved.savedAt, 'should record when it was saved');
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'true');
+      assert.ok(saveBtn.classList.contains('saved'));
+    });
+
+    it('removes the cat from chrome.storage.local when unsaving', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-1', name: 'Milo' }] });
+      let setPayload;
+      window.chrome.storage.local.set = async (val) => { setPayload = val; };
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(setPayload.savedCats.length, 0);
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false');
+      assert.equal(saveBtn.classList.contains('saved'), false);
+    });
+
+    it('shows a notice and leaves the button state unchanged if storage.set fails', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [] });
+      window.chrome.storage.local.set = async () => { throw new Error('disk full'); };
+      window.console.error = () => {};
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false', 'save should not appear to have succeeded');
+      assert.ok(document.getElementById('notice').textContent.includes("Couldn't update"));
+    });
+  });
+
   describe('renderCard long-name handling', () => {
     it('adds the name-long modifier once the name passes 18 characters', () => {
       window.renderCard({ name: "Sir Reginald Fluffington III" });
