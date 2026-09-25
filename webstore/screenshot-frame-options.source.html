@@ -1,9 +1,10 @@
 <!doctype html>
 <!--
   Companion to screenshot-frame.source.html for the Settings screenshot --
-  see that file's header comment for the full rationale. This one wraps
-  options.html's markup instead of newtab.html's, since it's a separate
-  page with its own script (options.js) rather than a "scene" of newtab.js.
+  see that file's header comment for the full rationale, including why (per
+  issue #66) the <main class="shell">...</main> markup is fetched from the
+  real extension/options.html at load time and injected into .stage, rather
+  than hand-copied into this file.
 
   Capture instructions: same as screenshot-frame.source.html -- serve the
   repo root at http://localhost:4173, then open
@@ -21,42 +22,26 @@
 </style>
 </head>
 <body>
-  <div class="stage">
-    <main class="shell">
-      <header>
-        <p class="eyebrow">TABBY SETTINGS</p>
-        <button id="close-settings" class="quiet" type="button" aria-label="Close settings">Close</button>
-      </header>
-      <section class="location-panel">
-        <h1>Your Location</h1>
-        <p class="panel-sub">Tabby uses this to find adoptable cats nearest to you.</p>
-        <form id="settings-form">
-          <div class="location-actions">
-            <button id="use-location" class="primary" type="button">Use my location</button>
-          </div>
-          <p class="or-divider"><span></span>or<span></span></p>
-          <div class="zip-field-block">
-            <div class="zip-field">
-              <div class="form-floating">
-                <input id="zip" type="text" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder=" ">
-                <label for="zip">Zip code</label>
-              </div>
-              <button type="submit">Save</button>
-            </div>
-            <p class="field-hint">Optional — skip this if you use your location.</p>
-          </div>
-        </form>
-        <p id="saved" class="notice" role="status" hidden></p>
-      </section>
-    </main>
-  </div>
+  <div class="stage"></div>
 <script>
   window.chrome = {
     storage: { local: { get: async () => ({ settings: { postalcode: '90210' } }), set: async () => {} } },
     runtime: { getURL: (path) => path },
     tabs: { query: (_q, cb) => cb([{ id: 1 }]) }
   };
+
+  async function boot() {
+    const response = await fetch('http://localhost:4173/extension/options.html');
+    const html = await response.text();
+    const shell = new DOMParser().parseFromString(html, 'text/html').querySelector('main.shell');
+    document.querySelector('.stage').appendChild(document.importNode(shell, true));
+
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = 'http://localhost:4173/extension/options.js';
+    document.body.appendChild(script);
+  }
+  boot();
 </script>
-<script type="module" src="http://localhost:4173/extension/options.js"></script>
 </body>
 </html>

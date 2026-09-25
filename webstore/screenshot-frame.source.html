@@ -13,14 +13,15 @@
   scales the whole rendered card up via CSS transform so it fills 80%+ of
   the canvas width instead of a fixed 620px.
 
-  The <main class="shell">...</main> markup below is hand-copied from
-  extension/newtab.html, since the real newtab.js's top-level functions
-  are private to its module scope (unlike the test suite's classic-script
-  inlining) and there's no clean way to fetch+inject the real HTML's body
-  without base-URL complications. If newtab.html's structure changes,
-  this copy needs to be updated to match -- same maintenance model as
-  promo-marquee.source.html / promo-small-tile.source.html already use for
-  their own hand-built markup.
+  Per issue #66: the <main class="shell">...</main> markup is fetched from
+  the real extension/newtab.html at load time and injected into .stage,
+  rather than hand-copied into this file -- a hand copy silently went stale
+  when the header switched to icon buttons (#55/#63), and all 6 shipped
+  screenshots drifted out of sync with the real product as a result. Fetching
+  the real markup means it can't drift again: whatever newtab.html's body
+  actually contains is exactly what gets captured. The real newtab.js module
+  script is only appended (and only starts running) once that injection
+  completes, since it queries the DOM for #card/#notice/etc. on load.
 
   Capture instructions:
   1. Serve the repo root at http://localhost:4173 (same convention as the
@@ -50,11 +51,12 @@
        meta this scene doesn't otherwise need, are in frame)
      screenshot-6-share.png:
        ?scene=share&scale=1.3&shiftY=-140
-       (auto-clicks the Share button 200ms after load; shifted down enough
-       to bring the actions row into frame -- the menu itself renders into
-       document.body, not .stage, so it isn't scaled by --scale, but it
-       still self-positions correctly since positionShareMenu() reads the
-       button's real post-transform rect)
+       (auto-clicks the Share button ~300ms after the real markup/script
+       are in place; shifted down enough to bring the actions row into
+       frame -- the menu itself renders into document.body, not .stage, so
+       it isn't scaled by --scale, but it still self-positions correctly
+       since positionShareMenu() reads the button's real post-transform
+       rect)
 
      screenshot-4-settings.png comes from the companion
      screenshot-frame-options.source.html (no query params needed -- the
@@ -98,50 +100,13 @@
 </style>
 </head>
 <body>
-  <div class="stage">
-    <main class="shell">
-      <header>
-        <div class="brand">
-          <p class="wordmark">Tabby</p>
-          <span class="brand-rule" aria-hidden="true"></span>
-          <p class="tagline">One cat at a time.</p>
-        </div>
-        <div class="header-actions">
-          <button id="explore" class="quiet" type="button">Explore another area</button>
-          <button id="settings" class="quiet">Settings</button>
-        </div>
-      </header>
-      <section id="card" class="card loading" aria-live="polite" hidden><p>Finding an adoptable cat near you…</p></section>
-      <section id="location-panel" class="location-panel" hidden>
-        <h1>Find cats near you</h1>
-        <p>Use your location for the closest available cats.</p>
-        <div class="location-actions">
-          <button id="use-location" class="primary" type="button">Use my location</button>
-          <button id="open-settings" class="secondary" type="button">or enter your zip code</button>
-        </div>
-      </section>
-      <p id="explore-banner" class="notice" role="status" hidden><span class="explore-text">Exploring near <span id="explore-label"></span>.</span><span class="explore-links"><button id="show-another-explore-cat" class="notice-link" type="button">Show another cat</button> · <button id="back-to-my-area" class="notice-link" type="button">Back to my area</button></span></p>
-      <p id="notice" class="notice" role="status" hidden></p>
-      <footer class="footer">
-        <p class="credit">Built by <a href="https://linke.ro/brandon" target="_blank" rel="noopener noreferrer">Brandon</a></p>
-        <p class="links">
-          <a href="https://github.com/BrandonML/tabby" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <span class="sep">·</span>
-          <a href="https://www.facebook.com/scivolette" target="_blank" rel="noopener noreferrer">Facebook</a>
-          <span class="sep">·</span>
-          <a href="https://www.linkedin.com/in/scivolette/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-          <span class="sep">·</span>
-          <a href="https://buymeacoffee.com/scivolette" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
-          <span class="sep">·</span>
-          <a href="https://github.com/BrandonML/tabby/issues" target="_blank" rel="noopener noreferrer">Report an issue</a>
-        </p>
-      </footer>
-    </main>
-  </div>
+  <div class="stage"></div>
 <script>
-  // Stubs chrome.* and fetch with canned data instead of a live API call --
-  // this classic script runs before the deferred module script below, so
-  // the real newtab.js sees these in place from its very first line.
+  // Stubs chrome.* and fetch with canned data instead of a live API call.
+  // Runs, and completes the real-markup injection below, before the real
+  // newtab.js module script is ever added to the page -- see the header
+  // comment for why injection can't just race the original static
+  // <script type="module"> tag this file used to have.
   const scene = new URLSearchParams(location.search).get('scene') || 'main';
 
   const SAMPLE_CARD = {
@@ -184,33 +149,47 @@
     tabs: { query: (_q, cb) => cb([{ id: 1 }]), update: () => {} }
   };
 
+  const realFetch = window.fetch.bind(window);
   window.fetch = async (url, opts) => {
     if (scene === 'explore' && String(url).includes('/api/nearby-cats')) {
       return { ok: true, json: async () => ({ cards: [EXPLORE_CARD], radiusMiles: 25 }) };
     }
-    // Any other call (a background refresh, etc.) is a no-op that never
+    // Any other call to the (stubbed-out) API is a no-op that never
     // resolves -- the initial render already came from the seeded cache
-    // above, so nothing should visibly change if this fires.
-    return new Promise(() => {});
+    // above, so nothing should visibly change if this fires. The real
+    // fetch is kept around (see realFetch above) for this file's own
+    // markup-injection fetch just below, which does need to hit the network.
+    if (String(url).includes('/api/')) return new Promise(() => {});
+    return realFetch(url, opts);
   };
-
-  if (scene === 'explore') {
-    window.addEventListener('load', () => {
-      setTimeout(() => document.getElementById('explore').click(), 200);
-    });
-  }
-
-  if (scene === 'share') {
-    window.addEventListener('load', () => {
-      setTimeout(() => document.querySelector('#card .share')?.click(), 200);
-    });
-  }
 
   const scaleOverride = new URLSearchParams(location.search).get('scale');
   if (scaleOverride) document.documentElement.style.setProperty('--scale', scaleOverride);
   const shiftYOverride = new URLSearchParams(location.search).get('shiftY');
   if (shiftYOverride) document.documentElement.style.setProperty('--shift-y', `${shiftYOverride}px`);
+
+  async function boot() {
+    const response = await window.fetch('http://localhost:4173/extension/newtab.html');
+    const html = await response.text();
+    const shell = new DOMParser().parseFromString(html, 'text/html').querySelector('main.shell');
+    document.querySelector('.stage').appendChild(document.importNode(shell, true));
+
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = 'http://localhost:4173/extension/newtab.js';
+    document.body.appendChild(script);
+
+    // newtab.js's own init (including the explore/share scene triggers
+    // below) needs a beat after its module script is appended to attach
+    // event listeners and render the seeded card.
+    if (scene === 'explore') {
+      setTimeout(() => document.getElementById('explore').click(), 300);
+    }
+    if (scene === 'share') {
+      setTimeout(() => document.querySelector('#card .share')?.click(), 300);
+    }
+  }
+  boot();
 </script>
-<script type="module" src="http://localhost:4173/extension/newtab.js"></script>
 </body>
 </html>
