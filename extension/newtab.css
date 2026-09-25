@@ -475,13 +475,25 @@ input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px
   border-radius: 10px;
   padding: 10px;
 }
-.saved-item-photo {
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: var(--wall);
+/* 96px -- a clear step up from the original 64px without the row growing
+   tall enough to feel like a grid of photos instead of a compact list. */
+.saved-item-photo-btn {
   flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--wall);
+  cursor: pointer;
+  overflow: hidden;
+}
+.saved-item-photo-btn:hover { opacity: 0.85; }
+.saved-item-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .saved-item-info { flex: 1 1 auto; min-width: 0; }
 .saved-item-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; margin: 0; }
@@ -498,6 +510,40 @@ input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px
   border-radius: 8px;
 }
 .saved-item-remove:hover { background: var(--stamp); color: var(--paper); }
+
+/* Lightbox (issue #43 follow-up) -- a small hand-built overlay rather than
+   a library: the only behavior needed is "show the original-resolution
+   photo, dismiss on click-outside/Escape/close button", which doesn't
+   justify an external dependency. */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(20, 18, 14, 0.85);
+}
+.lightbox-img { max-width: 90vw; max-height: 90vh; border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--paper);
+  cursor: pointer;
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.3); }
+.lightbox-close svg { width: 20px; height: 20px; }
 
 .footer {
   margin-top: 32px;

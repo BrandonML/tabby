@@ -265,7 +265,8 @@ describe('newtab.js DOM manipulation', () => {
       rescueUrl: 'https://rescue.org',
       profileUrl: 'https://rescue.org/animals/milo',
       adoptionFee: '$50',
-      imageUrl: 'https://image.org/cat.jpg'
+      imageUrl: 'https://image.org/cat.jpg',
+      originalImageUrl: 'https://image.org/cat-original.jpg'
     };
 
     it('renders unsaved by default when the cat is not in savedCats', async () => {
@@ -306,6 +307,7 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(saved.name, 'Milo');
       assert.equal(saved.breed, 'Tabby');
       assert.equal(saved.profileUrl, 'https://rescue.org/animals/milo');
+      assert.equal(saved.originalImageUrl, 'https://image.org/cat-original.jpg');
       assert.ok(saved.savedAt, 'should record when it was saved');
 
       const saveBtn = document.querySelector('.save-btn');

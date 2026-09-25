@@ -76,6 +76,65 @@ describe('saved.js', () => {
     assert.ok(item.querySelector('.saved-item-remove'));
   });
 
+  describe('lightbox (larger photo on click)', () => {
+    beforeEach(async () => {
+      mountWith([{
+        id: 'cat-1', name: 'Milo', imageUrl: 'https://image.org/cat.jpg',
+        originalImageUrl: 'https://image.org/cat-original.jpg',
+        savedAt: new Date().toISOString()
+      }]);
+      await new Promise(r => setTimeout(r, 10));
+    });
+
+    it('opens the original-resolution photo in an overlay on click', () => {
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+
+      const overlay = document.querySelector('.lightbox-overlay');
+      assert.ok(overlay);
+      assert.equal(overlay.querySelector('.lightbox-img').src, 'https://image.org/cat-original.jpg');
+    });
+
+    it('falls back to imageUrl when originalImageUrl is missing', async () => {
+      mountWith([{ id: 'cat-2', name: 'Biscuit', imageUrl: 'https://image.org/biscuit.jpg', savedAt: new Date().toISOString() }]);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+
+      assert.equal(document.querySelector('.lightbox-img').src, 'https://image.org/biscuit.jpg');
+    });
+
+    it('closes when the close button is clicked', () => {
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+      document.querySelector('.lightbox-close').dispatchEvent(new window.Event('click'));
+
+      assert.equal(document.querySelector('.lightbox-overlay'), null);
+    });
+
+    it('closes when clicking outside the image (the overlay backdrop)', () => {
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+      const overlay = document.querySelector('.lightbox-overlay');
+      overlay.dispatchEvent(new window.Event('click'));
+
+      assert.equal(document.querySelector('.lightbox-overlay'), null);
+    });
+
+    it('does not close when clicking the image itself', () => {
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+      const img = document.querySelector('.lightbox-img');
+      const event = new window.Event('click', { bubbles: true });
+      img.dispatchEvent(event);
+
+      assert.ok(document.querySelector('.lightbox-overlay'), 'overlay should still be open');
+    });
+
+    it('closes on Escape', () => {
+      document.querySelector('.saved-item-photo-btn').dispatchEvent(new window.Event('click'));
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+
+      assert.equal(document.querySelector('.lightbox-overlay'), null);
+    });
+  });
+
   it('shows only one link when rescueUrl and profileUrl match (issue #51 parity)', async () => {
     mountWith([{
       id: 'cat-1', name: 'Milo', imageUrl: 'https://image.org/cat.jpg',

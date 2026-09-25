@@ -25,16 +25,80 @@ async function removeSavedCat(id) {
   await chrome.storage.local.set({ savedCats: savedCats.filter((saved) => saved.id !== id) });
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+function buildCloseIcon() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  for (const d of ["M18 6 6 18", "m6 6 12 12"]) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
+// Small hand-built lightbox (no external library) -- shows the
+// original-resolution photo full-screen, dismissed by clicking outside the
+// image, the close button, or Escape.
+function openLightbox(imageUrl, altText) {
+  const overlay = document.createElement("div");
+  overlay.className = "lightbox-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", altText);
+
+  const img = document.createElement("img");
+  img.className = "lightbox-img";
+  img.src = imageUrl;
+  img.alt = altText;
+  img.referrerPolicy = "no-referrer";
+  overlay.appendChild(img);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "lightbox-close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.appendChild(buildCloseIcon());
+  overlay.appendChild(closeBtn);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener("keydown", onKeydown);
+  }
+  function onKeydown(event) {
+    if (event.key === "Escape") close();
+  }
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
+  closeBtn.addEventListener("click", close);
+  document.addEventListener("keydown", onKeydown);
+
+  document.body.appendChild(overlay);
+  closeBtn.focus();
+}
+
 function buildSavedItem(saved) {
   const item = document.createElement("div");
   item.className = "saved-item";
 
+  const photoBtn = document.createElement("button");
+  photoBtn.type = "button";
+  photoBtn.className = "saved-item-photo-btn";
+  photoBtn.setAttribute("aria-label", `View larger photo of ${saved.name}`);
   const img = document.createElement("img");
   img.className = "saved-item-photo";
   img.src = saved.imageUrl;
   img.alt = saved.name;
   img.referrerPolicy = "no-referrer";
-  item.appendChild(img);
+  photoBtn.appendChild(img);
+  photoBtn.addEventListener("click", () => openLightbox(saved.originalImageUrl || saved.imageUrl, saved.name));
+  item.appendChild(photoBtn);
 
   const info = document.createElement("div");
   info.className = "saved-item-info";
