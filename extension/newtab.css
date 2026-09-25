@@ -81,6 +81,12 @@ button:hover { background: var(--moss-dark); }
 .icon-btn:hover { background: var(--wall); }
 .icon-btn svg { width: 18px; height: 18px; }
 
+/* Signals at least one saved cat exists (issue #43 follow-up) -- just a
+   stroke-color change via currentColor, not a filled/solid heart, so the
+   header icon doesn't start looking like a pressed toggle (it isn't one;
+   it always just navigates to the Saved cats page). */
+.icon-btn.has-saved { color: var(--stamp); }
+
 h1 { margin: 0; font-weight: 700; color: var(--ink); }
 
 .card {
@@ -151,6 +157,33 @@ h1 { margin: 0; font-weight: 700; color: var(--ink); }
 }
 .badge.new { background: var(--moss); }
 .badge.senior { background: var(--stamp); }
+
+/* Save toggle (issue #43) -- mirrors .badges' overlay positioning but
+   anchored top-right instead, so it never collides with the New/Senior
+   badges at top-left. A solid translucent circle (rather than a bare icon)
+   keeps the heart legible against photos of any brightness, same reasoning
+   as the badge pills. */
+.save-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(42, 38, 32, 0.45);
+  color: var(--paper);
+  cursor: pointer;
+}
+.save-btn svg { width: 18px; height: 18px; }
+.save-btn:hover { background: rgba(42, 38, 32, 0.6); }
+.save-btn.saved { color: var(--stamp); background: var(--paper); }
+.save-btn.saved:hover { background: var(--paper); }
 
 .content { padding: 16px 22px 22px; }
 
@@ -437,6 +470,86 @@ input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px
 }
 .faq-item[open] summary::after { transform: rotate(45deg); }
 .faq-item p { margin: 0 2px 14px; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+
+/* Saved cats page (issue #43) */
+.saved-list { display: flex; flex-direction: column; gap: 14px; }
+.saved-item {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  padding: 10px;
+}
+/* 96px -- a clear step up from the original 64px without the row growing
+   tall enough to feel like a grid of photos instead of a compact list. */
+.saved-item-photo-btn {
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--wall);
+  cursor: pointer;
+  overflow: hidden;
+}
+.saved-item-photo-btn:hover { opacity: 0.85; }
+.saved-item-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.saved-item-info { flex: 1 1 auto; min-width: 0; }
+.saved-item-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; margin: 0; }
+.saved-item-meta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-soft); margin: 2px 0 0; }
+.saved-item-links { margin: 4px 0 0; font-size: 0.8125rem; }
+.saved-item-links a { color: var(--moss-dark); text-decoration: underline; text-underline-offset: 2px; }
+.saved-item-remove {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--stamp);
+  border: 1.5px solid var(--stamp);
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  border-radius: 8px;
+}
+.saved-item-remove:hover { background: var(--stamp); color: var(--paper); }
+
+/* Lightbox (issue #43 follow-up) -- a small hand-built overlay rather than
+   a library: the only behavior needed is "show the original-resolution
+   photo, dismiss on click-outside/Escape/close button", which doesn't
+   justify an external dependency. */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(20, 18, 14, 0.85);
+}
+.lightbox-img { max-width: 90vw; max-height: 90vh; border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--paper);
+  cursor: pointer;
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.3); }
+.lightbox-close svg { width: 20px; height: 20px; }
 
 .footer {
   margin-top: 32px;

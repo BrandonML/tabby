@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tabby saved cats</title><link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png"><link rel="icon" type="image/png" sizes="32x32" href="icons/icon32.png"><link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="newtab.css"></head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="eyebrow">SAVED CATS</p>
+        <button id="back-to-tabby" class="icon-btn" type="button" aria-label="Back to Tabby" title="Back to Tabby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+      </header>
+      <section class="location-panel saved-panel">
+        <h1>Saved cats</h1>
+        <p class="panel-sub">Cats you've saved from the new tab page. Saved cats stay here even after they're adopted elsewhere or drop out of your regular feed. They're saved only on this device, not in the cloud, so they won't survive things like uninstalling Tabby.</p>
+        <p id="saved-empty" class="panel-sub" hidden>You haven't saved any cats yet. Tap the heart on a cat's photo to save it here.</p>
+        <div id="saved-list" class="saved-list"></div>
+      </section>
+    </main>
+    <script type="module" src="saved.js"></script>
+  </body>
+</html>

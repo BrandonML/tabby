@@ -42,6 +42,14 @@ const TALL_PORTRAIT_HEIGHT_RATIO = 1.3;
 const PORTRAIT_ANALYSIS_MIN_CONFIDENCE = 1.1;
 const PORTRAIT_ANALYSIS_TIMEOUT_MS = 5000;
 const PHOTO_SHARE_TIMEOUT_MS = 6000;
+// Issue #69: a network failure (photo load, refresh, or explore) previously
+// surfaced the same message it would for an unrelated cause (a removed
+// photo, a bad ZIP), which is actively misleading when the real problem is
+// just "no internet". navigator.onLine is a reliable true-negative signal
+// -- it can't be true while genuinely offline -- so it's checked first and
+// gets its own message; a false "online" reading just falls through to the
+// existing per-context error handling unchanged.
+const OFFLINE_MESSAGE = "You're offline. Reconnect and refresh to keep browsing cats.";
 const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
 const TABBY_EDGE_URL = "https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho";
 const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
@@ -95,6 +103,57 @@ const EXPLORE_LOCATIONS = [
 
 function storageGet(keys) { return chrome.storage.local.get(keys); }
 function storageSet(value) { return chrome.storage.local.set(value); }
+
+// Issue #43: saved cats persist via chrome.storage.local (not .sync) --
+// WEBSTORE.md's permissions justification explicitly tells reviewers Tabby
+// never syncs data to Google's servers, and changing that is a real
+// privacy-posture decision, not just a code choice. See GitHub issue #43
+// for that trade-off (sync would survive an uninstall/new device, local
+// doesn't) if this ever needs revisiting. A snapshot is stored at save time
+// rather than just the id, since a saved cat can be adopted or delisted
+// later and the saved list should still show something for it.
+async function getSavedCats() {
+  const { savedCats } = await storageGet(["savedCats"]);
+  return Array.isArray(savedCats) ? savedCats : [];
+}
+
+function isCardSaved(id, savedCats) {
+  return savedCats.some((saved) => saved.id === id);
+}
+
+function snapshotForSave(card) {
+  return {
+    id: card.id,
+    name: card.name,
+    breed: card.breed || null,
+    age: card.age || null,
+    sex: card.sex || null,
+    imageUrl: card.imageUrl,
+    originalImageUrl: card.originalImageUrl || null,
+    rescueName: card.rescueName,
+    rescueUrl: card.rescueUrl || null,
+    profileUrl: card.profileUrl || null,
+    adoptionFee: card.adoptionFee || null,
+    savedAt: new Date().toISOString()
+  };
+}
+
+// Returns the new saved state (true = now saved) so the caller can update
+// the toggle button without a second read.
+async function toggleSaveCard(card) {
+  const savedCats = await getSavedCats();
+  const existingIndex = savedCats.findIndex((saved) => saved.id === card.id);
+  const nextSaved = existingIndex < 0 ? [...savedCats, snapshotForSave(card)] : savedCats.filter((_, i) => i !== existingIndex);
+  try {
+    await storageSet({ savedCats: nextSaved });
+  } catch (error) {
+    console.error("[tabby]", error);
+    showNotice("Couldn't update your saved cats right now. Try again.", { type: "error" });
+    return existingIndex >= 0; // unchanged
+  }
+  return existingIndex < 0;
+}
+
 function randomCard(cards) { return cards[Math.floor(Math.random() * cards.length)]; }
 function setCardVisible(visible) {
   const card = $("card");
@@ -281,6 +340,63 @@ function getSeenIds(feedCache) {
   return Array.isArray(feedCache?.seenIds) ? feedCache.seenIds : [];
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+// Same heart glyph as the header's "Saved cats" icon-btn (extension/newtab.html)
+// -- built via the DOM rather than innerHTML to match this file's "no
+// innerHTML" convention (see renderCard's "Clear securely" comment), even
+// though this particular markup is static, not user data.
+const HEART_PATH_D = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
+
+function buildHeartIcon() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", HEART_PATH_D);
+  svg.appendChild(path);
+  return svg;
+}
+
+function setSaveButtonState(button, card, saved) {
+  button.setAttribute("aria-pressed", String(saved));
+  const label = saved ? `Unsave ${card.name}` : `Save ${card.name}`;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  button.classList.toggle("saved", saved);
+  button.querySelector("svg").setAttribute("fill", saved ? "currentColor" : "none");
+}
+
+// Header "Saved cats" icon recolors (via currentColor, not a filled heart --
+// see .icon-btn.has-saved in newtab.css) once there's at least one saved
+// cat, so there's a passive hint the list isn't empty without implying the
+// nav icon itself is a toggle.
+async function updateSavedHeaderIndicator() {
+  const savedCats = await getSavedCats();
+  $("saved").classList.toggle("has-saved", savedCats.length > 0);
+}
+
+function buildSaveButton(card) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "save-btn";
+  button.appendChild(buildHeartIcon());
+  setSaveButtonState(button, card, false);
+  getSavedCats().then((savedCats) => setSaveButtonState(button, card, isCardSaved(card.id, savedCats)));
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    const saved = await toggleSaveCard(card);
+    setSaveButtonState(button, card, saved);
+    updateSavedHeaderIndicator();
+    button.disabled = false;
+  });
+  return button;
+}
+
 function nextCard(cards, seenIds = []) {
   const seenSet = new Set(seenIds);
   const unseenCards = cards.filter((card) => !seenSet.has(card.id));
@@ -308,6 +424,15 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   const badges = [card.isNew && { label: "New", className: "new" }, card.isSenior && { label: "Senior", className: "senior" }].filter(Boolean);
   const rescueUrl = card.rescueUrl || card.profileUrl;
   const profileUrl = card.profileUrl;
+  // Issue #51: ~85% of orgs don't configure a per-animal profile URL, so
+  // rescueUrl and profileUrl end up pointing at the exact same page (either
+  // because rescueUrl's own fallback above kicks in, or because the org's
+  // "animal profile" URL RescueGroups hands back is just its own homepage).
+  // Showing two links to the same destination reads as a mistake, not a
+  // feature -- when they match, "View profile" (the styled action button,
+  // already what feeds the share flow) stays as the one link, and the
+  // rescue name above it drops back to plain text.
+  const showRescueLink = Boolean(rescueUrl) && rescueUrl !== profileUrl;
 
   const cardContainer = $("card");
   cardContainer.className = "card";
@@ -322,7 +447,10 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   img.src = card.imageUrl;
   img.alt = card.name;
   img.referrerPolicy = "no-referrer";
-  img.addEventListener("error", () => { showNotice("That photo is no longer available. Refresh to try another cat.", { type: "error" }); });
+  img.addEventListener("error", () => {
+    const message = navigator.onLine === false ? OFFLINE_MESSAGE : "That photo is no longer available. Refresh to try another cat.";
+    showNotice(message, { type: "error" });
+  });
   img.addEventListener("load", () => {
     // A portrait-oriented photo (taller than wide) can't fill the card's
     // full width without either cropping or shrinking down to fit beside
@@ -354,6 +482,8 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
     }
     photoFrame.appendChild(badgesDiv);
   }
+
+  photoFrame.appendChild(buildSaveButton(card));
 
   cardContainer.appendChild(photoFrame);
 
@@ -411,7 +541,7 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
 
   const rescueP = document.createElement("p");
   rescueP.className = "rescue";
-  if (rescueUrl) {
+  if (showRescueLink) {
     const rescueA = document.createElement("a");
     rescueA.href = rescueUrl;
     rescueA.target = "_blank";
@@ -792,14 +922,18 @@ async function _start({ requestLocation = false } = {}) {
   if (shouldRefresh) {
     try { await refresh(location, locationLabel); } catch (error) {
       console.error("[tabby]", error);
-      const finalMessage = classifyRefreshError(error.message);
-      // A ZIP-validation failure already carries enough detail to know it's
-      // a user issue, so it keeps the settings shortcut instead — the
-      // report-issue link is for failures that might actually be our bug.
-      const noticeOptions = isInvalidZipError(error.message)
-        ? { links: [ZIP_SETTINGS_LINK], type: "error" }
-        : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
-      showNotice(finalMessage, noticeOptions);
+      if (navigator.onLine === false) {
+        showNotice(OFFLINE_MESSAGE, { type: "error" });
+      } else {
+        const finalMessage = classifyRefreshError(error.message);
+        // A ZIP-validation failure already carries enough detail to know it's
+        // a user issue, so it keeps the settings shortcut instead — the
+        // report-issue link is for failures that might actually be our bug.
+        const noticeOptions = isInvalidZipError(error.message)
+          ? { links: [ZIP_SETTINGS_LINK], type: "error" }
+          : { links: [{ text: "Report an issue", action: "report-issue" }], type: "error" };
+        showNotice(finalMessage, noticeOptions);
+      }
       if (!feedCache?.cards?.length) $("location-panel").hidden = false;
     }
   }
@@ -846,7 +980,7 @@ async function exploreArea() {
     console.error("[tabby]", error);
     exploreBatch = null;
     hideExploreBanner();
-    showNotice("Unable to explore that area right now. Try again.", { type: "error" });
+    showNotice(navigator.onLine === false ? OFFLINE_MESSAGE : "Unable to explore that area right now. Try again.", { type: "error" });
   }
 }
 
@@ -882,8 +1016,18 @@ function openFaq() {
   });
 }
 
+function openSaved() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+    if (tab?.id) {
+      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("extension/saved.html") });
+    }
+  });
+}
+
 $("settings").addEventListener("click", openSettings);
 $("faq").addEventListener("click", openFaq);
+$("saved").addEventListener("click", openSaved);
 $("use-location").addEventListener("click", async () => {
   $("location-panel").hidden = true;
   showNotice("Finding your location…");
@@ -898,3 +1042,4 @@ $("back-to-my-area").addEventListener("click", async () => {
   await start();
 });
 start();
+updateSavedHeaderIndicator();

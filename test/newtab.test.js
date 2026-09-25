@@ -166,6 +166,218 @@ describe('newtab.js DOM manipulation', () => {
     assert.equal(card.querySelectorAll('.badges').length, 0);
   });
 
+  describe('rescue/profile link redundancy (issue #51)', () => {
+    it('drops the rescue-name link and keeps only View profile when both URLs match', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: "https://rescue.org",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueP = card.querySelector('.rescue');
+      assert.equal(rescueP.querySelector('a'), null, 'rescue name should render as plain text');
+      assert.equal(rescueP.textContent, "Second Chance Rescue");
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA, 'View profile button should still render');
+      assert.equal(profileA.href, "https://rescue.org/");
+    });
+
+    it('drops the rescue-name link when profileUrl is missing and rescueUrl falls back to it (both empty)', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: null,
+        profileUrl: "https://rescue.org",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueP = card.querySelector('.rescue');
+      assert.equal(rescueP.querySelector('a'), null, 'rescueUrl falling back to profileUrl makes them identical -- no separate link');
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA);
+      assert.equal(profileA.href, "https://rescue.org/");
+    });
+
+    it('shows both links when rescueUrl and profileUrl genuinely differ', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: "https://rescue.rescuegroups.org/animals/detail?AnimalID=123",
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueA = card.querySelector('.rescue a');
+      assert.ok(rescueA, 'rescue name should still link when the URLs differ');
+      assert.equal(rescueA.href, "https://rescue.org/");
+      const profileA = card.querySelector('.profile');
+      assert.ok(profileA);
+      assert.equal(profileA.href, "https://rescue.rescuegroups.org/animals/detail?AnimalID=123");
+    });
+
+    it('shows the rescue-name link on its own when there is no profileUrl at all', () => {
+      window.renderCard({
+        name: "Milo",
+        rescueName: "Second Chance Rescue",
+        rescueUrl: "https://rescue.org",
+        profileUrl: null,
+        imageUrl: "https://image.org/cat.jpg"
+      });
+      const card = document.getElementById("card");
+      const rescueA = card.querySelector('.rescue a');
+      assert.ok(rescueA);
+      assert.equal(card.querySelector('.profile'), null, 'no View profile button without a profileUrl');
+    });
+  });
+
+  describe('photo load failure (issue #69)', () => {
+    it('shows the generic "photo unavailable" notice when the image fails to load while online', () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+
+      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('shows an offline-specific notice when the image fails to load while offline', () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+
+      const noticeText = document.getElementById('notice').textContent;
+      assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
+      assert.ok(!noticeText.includes('no longer available'), 'should not show the generic missing-photo message while offline');
+    });
+  });
+
+  describe('Save cats (issue #43)', () => {
+    const cardData = {
+      id: 'cat-1',
+      name: 'Milo',
+      breed: 'Tabby',
+      age: 'Adult',
+      sex: 'Male',
+      rescueName: 'Second Chance Rescue',
+      rescueUrl: 'https://rescue.org',
+      profileUrl: 'https://rescue.org/animals/milo',
+      adoptionFee: '$50',
+      imageUrl: 'https://image.org/cat.jpg',
+      originalImageUrl: 'https://image.org/cat-original.jpg'
+    };
+
+    it('renders unsaved by default when the cat is not in savedCats', async () => {
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.ok(saveBtn);
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false');
+      assert.equal(saveBtn.classList.contains('saved'), false);
+      assert.equal(saveBtn.querySelector('svg').getAttribute('fill'), 'none');
+    });
+
+    it('renders as already-saved when the cat is already in savedCats', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-1', name: 'Milo' }] });
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'true');
+      assert.ok(saveBtn.classList.contains('saved'));
+      assert.equal(saveBtn.querySelector('svg').getAttribute('fill'), 'currentColor');
+    });
+
+    it('saves a snapshot of the cat to chrome.storage.local on click', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [] });
+      let setPayload;
+      window.chrome.storage.local.set = async (val) => { setPayload = val; };
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(setPayload.savedCats.length, 1);
+      const saved = setPayload.savedCats[0];
+      assert.equal(saved.id, 'cat-1');
+      assert.equal(saved.name, 'Milo');
+      assert.equal(saved.breed, 'Tabby');
+      assert.equal(saved.profileUrl, 'https://rescue.org/animals/milo');
+      assert.equal(saved.originalImageUrl, 'https://image.org/cat-original.jpg');
+      assert.ok(saved.savedAt, 'should record when it was saved');
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'true');
+      assert.ok(saveBtn.classList.contains('saved'));
+    });
+
+    it('removes the cat from chrome.storage.local when unsaving', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-1', name: 'Milo' }] });
+      let setPayload;
+      window.chrome.storage.local.set = async (val) => { setPayload = val; };
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      assert.equal(setPayload.savedCats.length, 0);
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false');
+      assert.equal(saveBtn.classList.contains('saved'), false);
+    });
+
+    it('shows a notice and leaves the button state unchanged if storage.set fails', async () => {
+      window.chrome.storage.local.get = async () => ({ savedCats: [] });
+      window.chrome.storage.local.set = async () => { throw new Error('disk full'); };
+      window.console.error = () => {};
+      window.renderCard(cardData);
+      await new Promise(r => setTimeout(r, 10));
+
+      document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      const saveBtn = document.querySelector('.save-btn');
+      assert.equal(saveBtn.getAttribute('aria-pressed'), 'false', 'save should not appear to have succeeded');
+      assert.ok(document.getElementById('notice').textContent.includes("Couldn't update"));
+    });
+
+    describe('header "Saved cats" indicator', () => {
+      it('has no has-saved class when there are no saved cats', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [] });
+        await window.updateSavedHeaderIndicator();
+
+        assert.equal(document.getElementById('saved').classList.contains('has-saved'), false);
+      });
+
+      it('gets the has-saved class once there is at least one saved cat', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [{ id: 'cat-9', name: 'Other' }] });
+        await window.updateSavedHeaderIndicator();
+
+        assert.ok(document.getElementById('saved').classList.contains('has-saved'));
+      });
+
+      it('turns on after saving a cat from the card, and off again after unsaving it', async () => {
+        window.chrome.storage.local.get = async () => ({ savedCats: [] });
+        window.chrome.storage.local.set = async (val) => { window.chrome.storage.local.get = async () => val; };
+        window.renderCard(cardData);
+        await new Promise(r => setTimeout(r, 10));
+
+        document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+        await new Promise(r => setTimeout(r, 10));
+        assert.ok(document.getElementById('saved').classList.contains('has-saved'), 'should turn on after saving');
+
+        document.querySelector('.save-btn').dispatchEvent(new window.Event('click'));
+        await new Promise(r => setTimeout(r, 10));
+        assert.equal(document.getElementById('saved').classList.contains('has-saved'), false, 'should turn back off after unsaving the only saved cat');
+      });
+    });
+  });
+
   describe('renderCard long-name handling', () => {
     it('adds the name-long modifier once the name passes 18 characters', () => {
       window.renderCard({ name: "Sir Reginald Fluffington III" });
@@ -620,6 +832,27 @@ describe('newtab.js DOM manipulation', () => {
       window.chrome.tabs.update = () => { updateCalled = true; };
 
       document.getElementById("faq").click();
+
+      assert.equal(updateCalled, false);
+    });
+  });
+  describe('Saved cats button (issue #43)', () => {
+    it('#saved replaces the current tab with the Saved cats page', () => {
+      let updatedTabId, updatedProps;
+      window.chrome.tabs.update = (tabId, props) => { updatedTabId = tabId; updatedProps = props; };
+
+      document.getElementById("saved").click();
+
+      assert.equal(updatedTabId, 1);
+      assert.equal(updatedProps.url, "chrome-extension://fake-id/extension/saved.html");
+    });
+
+    it('does nothing when there is no active tab to replace', () => {
+      window.chrome.tabs.query = (_query, callback) => callback([]);
+      let updateCalled = false;
+      window.chrome.tabs.update = () => { updateCalled = true; };
+
+      document.getElementById("saved").click();
 
       assert.equal(updateCalled, false);
     });
@@ -1519,6 +1752,18 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(link.textContent, 'zip code');
     });
 
+    it('shows an offline-specific notice (no report-issue/zip links) when refresh fails while offline', async () => {
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      window.console.error = () => {};
+
+      await window.start();
+
+      const notice = document.getElementById("notice");
+      assert.ok(notice.textContent.includes("offline"), `expected an offline-specific notice, got: ${notice.textContent}`);
+      assert.equal(notice.querySelector('.notice-link'), null, 'offline notice should not offer a report-issue or zip-code shortcut');
+    });
+
     it('prevents multiple concurrent executions', async () => {
       const p1 = window.start();
       const p2 = window.start();
@@ -1620,6 +1865,18 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(loggedErrors.length, 1);
       assert.equal(loggedErrors[0][0], '[tabby]');
       assert.ok(document.getElementById('notice').textContent.length > 0);
+    });
+
+    it('shows an offline-specific notice when the explore fetch fails while offline', async () => {
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      window.console.error = () => {};
+
+      document.getElementById('explore').dispatchEvent(new window.Event('click'));
+      await new Promise(r => setTimeout(r, 10));
+
+      const noticeText = document.getElementById('notice').textContent;
+      assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
     });
 
     it('shows the distance relative to the explored city, not the user, while exploring', async () => {
