@@ -198,4 +198,15 @@ describe('saved.js', () => {
     assert.deepEqual(createArgs, { url: 'chrome-extension://id/extension/newtab.html', active: true });
     assert.equal(removedTabId, 7);
   });
+
+  it('falls back to window.close() when there is no active tab to replace', async () => {
+    await new Promise(r => setTimeout(r, 10));
+    window.chrome.tabs.query = (_query, cb) => cb([]);
+    let closeCalled = false;
+    window.close = () => { closeCalled = true; };
+
+    document.getElementById('back-to-tabby').dispatchEvent(new window.Event('click'));
+
+    assert.ok(closeCalled);
+  });
 });
