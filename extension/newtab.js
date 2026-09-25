@@ -16,8 +16,21 @@ const SEEN_REFRESH_RATIO = 0.85;
 // instead: a merely-more-than-square photo (e.g. 500x508) stays on the
 // default crop, a moderately tall one gets a modestly taller top-anchored
 // box, and only the genuinely tall tail gets the full treatment.
+//
+// Issue #64: that "moderately tall" mild band was itself miscalibrated. A
+// second live sample (322 photos, 80 in the pre-existing 1.1-1.35 mild
+// range) showed it isn't a smooth spread either — 51% of the mild band
+// (46/80) clustered tightly at ratio ~1.333 (500x667 and equivalents, a
+// common shelter-photo-tool output size), sitting just under the old 1.35
+// tall cutoff and losing ~45% of the image's height to the top-anchored
+// crop as a result. Moving the cutoff down to 1.3 (clear of the scattered
+// low tail, which topped out at 1.276) puts that whole cluster on the
+// taller/tall-tier box instead, cutting its average crop to ~27%. The
+// remaining true-mild range (1.1-1.3) gets a modest height bump of its own
+// (see .photo-portrait-mild in newtab.css) since it was still losing
+// 34-44% before.
 const MILD_PORTRAIT_HEIGHT_RATIO = 1.1;
-const TALL_PORTRAIT_HEIGHT_RATIO = 1.35;
+const TALL_PORTRAIT_HEIGHT_RATIO = 1.3;
 // How much denser the winning row-band's edge energy has to be than the
 // photo's own average row before it's trusted as a real subject signal
 // rather than noise — see applyContentAwareCrop(). Calibrated against a

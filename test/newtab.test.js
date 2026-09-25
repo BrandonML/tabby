@@ -698,9 +698,9 @@ describe('newtab.js DOM manipulation', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
-    // Just under the 1.35x tall threshold (500 * 1.35 = 675).
+    // Just under the 1.3x tall threshold (500 * 1.3 = 650).
     Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
-    Object.defineProperty(img, 'naturalHeight', { value: 674, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 649, configurable: true });
     img.dispatchEvent(new window.Event('load'));
 
     assert.ok(img.classList.contains('photo-portrait-mild'));
@@ -710,9 +710,12 @@ describe('newtab.js DOM manipulation', () => {
     window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
     const img = document.querySelector('.photo');
-    // Just over the 1.35x tall threshold (500 * 1.35 = 675).
+    // Just over the 1.3x tall threshold (500 * 1.3 = 650). Real-world
+    // example from issue #64's live sample: this is ~500x652 (Whiskey,
+    // Cats for Life Inc.), part of the dominant ~4:3 cluster that used to
+    // fall on the wrong side of the old 1.35 cutoff.
     Object.defineProperty(img, 'naturalWidth', { value: 500, configurable: true });
-    Object.defineProperty(img, 'naturalHeight', { value: 676, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 651, configurable: true });
     img.dispatchEvent(new window.Event('load'));
 
     assert.ok(img.classList.contains('photo-portrait'));
