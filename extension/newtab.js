@@ -129,6 +129,7 @@ function snapshotForSave(card) {
     age: card.age || null,
     sex: card.sex || null,
     imageUrl: card.imageUrl,
+    originalImageUrl: card.originalImageUrl || null,
     rescueName: card.rescueName,
     rescueUrl: card.rescueUrl || null,
     profileUrl: card.profileUrl || null,
