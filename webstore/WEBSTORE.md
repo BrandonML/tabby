@@ -3,11 +3,18 @@
 > Last Updated: 2026-09-22
 
 **Chrome Web Store:** https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig
-**Edge Add-ons:** https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho
+
+**Edge Add-ons:** https://microsoftedge.microsoft.com/addons/detail/tabby-new-tab-for-adopta/fieeoalehgckgnkohkdblljmgaemaiho
 
 Both stores use the same package and listing content below — Edge is Chromium-based and needs no code changes (see [RELEASE.md](../RELEASE.md)).
 
 ## Store Listing
+
+**Category**
+
+Chrome: Just For Fun.
+
+Edge: Entertainment.
 
 **Extension Name**
 Tabby: New Tab for Adoptable Cats
@@ -33,7 +40,7 @@ See one real, nearby adoptable cat on every new tab.
 
 
 **Detailed Description**
-<!-- 2,169 / 16,000 chars. Plain text, no markdown — CWS strips it. -->
+<!-- Max 16,000 chars. Plain text, no markdown. Emojies and icons are allowed -->
 ```
 Tabby replaces your new tab page with one real, adoptable cat at a time — sourced live from RescueGroups.org, the same database thousands of shelters and rescues use every day.
 
@@ -44,6 +51,7 @@ FEATURES
 • Adoption-pending and special-needs cats are clearly flagged, so you know a cat's status before reaching out.
 • "Explore another area" lets you browse adoptable cats in other major U.S. cities, even if you're not planning to adopt locally.
 • Save a cat with the heart icon to find it again later, even after it's adopted or drops out of your regular feed.
+• Share a cat profile via multiple channels directly from the new tab page.
 • Fast and quiet — Tabby shows your last cat instantly from a local cache and refreshes in the background, so opening a new tab never feels slow.
 
 HOW TO USE
@@ -51,16 +59,6 @@ HOW TO USE
 2. Allow location access, or enter your ZIP code instead.
 3. See a nearby adoptable cat every time you open a new tab. Click "View profile" for more, or the rescue's name to visit their site.
 4. Click "Explore another area" to browse cats in other cities, or open Settings anytime to change your location.
-
-PRIVACY
-Tabby does not use ads or trackers. Basic, aggregate usage analytics (installs, active users) run through Chrome Web Store's own built-in GA4 integration — no analytics code ships in the extension itself. Your location or ZIP code is used only to search for nearby cats and is stored on your device — Tabby never sells your data or shares it with third parties beyond what's needed to run that search (see the Privacy Policy link on this listing for full details).
-
-PERMISSIONS
-"Storage" saves your ZIP code or location and your most recent cat listings locally on your device, so Tabby loads instantly on your next new tab.
-"Geolocation" is used only when you click "Use my location," to find cats near you — Tabby works just as well with a ZIP code if you'd rather not share it.
-
-SUPPORT
-Found a bug or have a suggestion? Open an issue at github.com/BrandonML/tabby/issues.
 ```
 
 
