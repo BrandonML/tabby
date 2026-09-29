@@ -477,6 +477,125 @@ describe("server routing and behavior", () => {
   });
 });
 
+describe("POST /api/validate-cats (issue #79)", () => {
+  let port;
+
+  beforeEach(async () => {
+    cache.clear();
+    resetRateLimitsForTests();
+    resetAlertStateForTests();
+    await new Promise((resolve) => server.listen(0, resolve));
+    port = server.address().port;
+  });
+
+  afterEach(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    mock.restoreAll();
+  });
+
+  const request = (options, body = null) => new Promise((resolve, reject) => {
+    const req = http.request({ ...options, hostname: "127.0.0.1", port }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => data += chunk);
+      res.on("end", () => resolve({ res, data }));
+    });
+    req.on("error", reject);
+    if (body !== null) req.write(body);
+    req.end();
+  });
+  const validate = (ids) => request({ path: "/api/validate-cats", method: "POST" }, JSON.stringify({ ids }));
+
+  it("returns the ids RescueGroups still lists as available, with CORS headers", async () => {
+    process.env.RG_API_KEY = "test-key";
+    const fetchSpy = mock.method(global, "fetch", async () => ({ ok: true, status: 200, json: async () => ({ data: [{ id: "101" }] }) }));
+
+    const { res, data } = await validate(["101", "202"]);
+
+    assert.strictEqual(res.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(data), { availableIds: ["101"] });
+    assert.ok(res.headers["access-control-allow-origin"]);
+    assert.strictEqual(fetchSpy.mock.callCount(), 1, "one RescueGroups request per call");
+    const [url, options] = fetchSpy.mock.calls[0].arguments;
+    assert.match(url, /available\/cats\/haspic/);
+    assert.deepStrictEqual(JSON.parse(options.body).data.filters, [{ fieldName: "animals.id", operation: "equal", criteria: ["101", "202"] }]);
+  });
+
+  it("is never served from the response cache, and does not populate it", async () => {
+    process.env.RG_API_KEY = "test-key";
+    const fetchSpy = mock.method(global, "fetch", async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) }));
+
+    await validate(["101"]);
+    await validate(["101"]);
+
+    assert.strictEqual(fetchSpy.mock.callCount(), 2, "availability is only useful fresh");
+    assert.strictEqual(cache.size, 0);
+  });
+
+  it("returns 405 with an Allow header for a non-POST method", async () => {
+    const { res } = await request({ path: "/api/validate-cats", method: "GET" });
+    assert.strictEqual(res.statusCode, 405);
+    assert.strictEqual(res.headers.allow, "POST");
+  });
+
+  it("answers the OPTIONS preflight", async () => {
+    const { res } = await request({ path: "/api/validate-cats", method: "OPTIONS" });
+    assert.strictEqual(res.statusCode, 204);
+  });
+
+  it("rejects invalid ids with a 400 and never calls RescueGroups", async () => {
+    process.env.RG_API_KEY = "test-key";
+    mock.method(console, "error", () => {});
+    const fetchSpy = mock.method(global, "fetch", async () => ({ ok: true, json: async () => ({ data: [] }) }));
+
+    for (const ids of [undefined, "101", [], ["abc"], ["101", null], Array.from({ length: 101 }, (_, i) => String(i + 1))]) {
+      const { res, data } = await validate(ids);
+      assert.strictEqual(res.statusCode, 400, `ids=${JSON.stringify(ids)?.slice(0, 40)} should be a 400`);
+      assert.strictEqual(JSON.parse(data).error, "Provide 1 to 100 numeric animal ids.");
+    }
+    assert.strictEqual(fetchSpy.mock.callCount(), 0);
+  });
+
+  it("returns 400 for a malformed JSON body, and for a body that is JSON null", async () => {
+    mock.method(console, "error", () => {});
+    const malformed = await request({ path: "/api/validate-cats", method: "POST" }, "{not json");
+    assert.strictEqual(malformed.res.statusCode, 400);
+    const nullBody = await request({ path: "/api/validate-cats", method: "POST" }, "null");
+    assert.strictEqual(nullBody.res.statusCode, 400);
+  });
+
+  it("returns 502 with the generic message when RescueGroups fails", async () => {
+    process.env.RG_API_KEY = "test-key";
+    mock.method(global, "fetch", async () => { throw new Error("Raw upstream crash"); });
+    const errorSpy = mock.method(console, "error", () => {});
+
+    const { res, data } = await validate(["101"]);
+
+    assert.strictEqual(res.statusCode, 502);
+    assert.strictEqual(JSON.parse(data).error, "Unable to refresh nearby cats right now.");
+    assert.strictEqual(errorSpy.mock.calls[0].arguments[1].message, "Raw upstream crash");
+  });
+
+  it("shares the per-IP rate limit with /api/nearby-cats", async () => {
+    mock.method(console, "error", () => {});
+    const badNearby = JSON.stringify({ location: { postalcode: "123" } });
+    for (let i = 0; i < 15; i++) await request({ path: "/api/nearby-cats", method: "POST" }, badNearby);
+    for (let i = 0; i < 15; i++) {
+      const { res } = await validate(["abc"]);
+      assert.strictEqual(res.statusCode, 400, `request ${i + 16} of 30 is still within the limit`);
+    }
+
+    const { res } = await validate(["abc"]);
+    assert.strictEqual(res.statusCode, 429);
+    const nearby = await request({ path: "/api/nearby-cats", method: "POST" }, badNearby);
+    assert.strictEqual(nearby.res.statusCode, 429, "one shared budget, not one per route");
+  });
+
+  it("still 404s a path that only starts with the route name", async () => {
+    const { res } = await request({ path: "/api/validate-cats/extra", method: "POST" }, "{}");
+    assert.strictEqual(res.statusCode, 404);
+  });
+});
+
 describe("upstream failure alerting", () => {
   let port;
   const webhookUrl = "https://discord.com/api/webhooks/test/token";

@@ -6,7 +6,7 @@
 // logs a message and exits 0 rather than failing.
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { buildSearchRequest } from "../server/rescuegroups.js";
+import { buildSearchRequest, findAvailableIds } from "../server/rescuegroups.js";
 
 if (!process.env.RG_API_KEY) {
   console.log("Skipping live RescueGroups test — set RG_API_KEY to run");
@@ -115,5 +115,32 @@ describe("RescueGroups live pagination contract", () => {
       (wide.payload?.meta?.count ?? 0) >= (mid.payload?.meta?.count ?? 0),
       "a wider radius returned fewer total matches than a narrower one — the API may be silently capping the search radius"
     );
+  });
+});
+
+// Issue #79: the extension revalidates a long-idle cache by asking which of
+// its cached ids are still available. This pins the two behaviors that
+// approach depends on, against the real API: an `animals.id` `equal` filter
+// with an array criteria works as an "in" filter on the available-cats
+// endpoint, and an id that isn't a currently-available listing is silently
+// left out (not an error). If either regresses, revalidation would either
+// fail open forever (harmless but useless) or -- worse -- drop live cats.
+describe("RescueGroups live by-id availability contract", () => {
+  it("returns exactly the requested ids that are available, silently omitting unknown ones", async () => {
+    const { url, body } = buildSearchRequest(LOCATION, 25);
+    const seed = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: API_KEY, "Content-Type": CONTENT_TYPE, Accept: CONTENT_TYPE },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8_000)
+    }).then((response) => response.json());
+    const realIds = idsOf(seed).slice(0, 20);
+    assert.ok(realIds.length >= 5, "need a handful of real available ids to test with");
+    const fakeIds = ["99999991", "99999992"];
+
+    const availableIds = await findAvailableIds([...realIds, ...fakeIds], { apiKey: API_KEY });
+
+    console.log("[live] asked about", realIds.length + fakeIds.length, "ids, got back", availableIds.length);
+    assert.deepEqual([...availableIds].sort(), [...realIds].sort(), "every real id should come back, and neither fake one");
   });
 });

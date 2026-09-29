@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
-import { findNearbyCats, validateLocation } from "./rescuegroups.js";
+import { findAvailableIds, findNearbyCats, validateLocation } from "./rescuegroups.js";
 
 const port = Number(process.env.PORT || 8787);
 // Comma-separated list — one origin per store build (Chrome, Edge, ...),
@@ -303,7 +303,8 @@ export const server = createServer(async (request, response) => {
     const requestUrl = new URL(request.url, "http://internal");
     return sendPhotoProxy(response, origin, requestUrl.searchParams.get("url") || "", buildPhotoShareUrl, PHOTO_SHARE_MAX_BYTES);
   }
-  if (request.url !== "/api/nearby-cats") return send(response, 404, { error: "Not found" }, origin);
+  const isValidateRoute = request.url === "/api/validate-cats";
+  if (request.url !== "/api/nearby-cats" && !isValidateRoute) return send(response, 404, { error: "Not found" }, origin);
   if (request.method !== "POST") return send(response, 405, { error: "Method Not Allowed" }, origin, { "Allow": "POST" });
 
   const retryAfterSeconds = checkRateLimit(clientIp(request));
@@ -314,7 +315,19 @@ export const server = createServer(async (request, response) => {
   }
 
   try {
-    const { location, page } = await bodyOf(request);
+    const body = await bodyOf(request);
+
+    // Issue #79: tells the extension which of its cached listings are still
+    // available, so a long-idle cache can drop the ones that aren't. One
+    // RescueGroups request per call (see findAvailableIds), deliberately
+    // uncached -- the answer is only useful fresh -- and behind the same
+    // per-IP limit as /api/nearby-cats.
+    if (isValidateRoute) {
+      const availableIds = await findAvailableIds(body?.ids, { apiKey: process.env.RG_API_KEY });
+      return send(response, 200, { availableIds }, origin);
+    }
+
+    const { location, page } = body;
     const safeLocation = validateLocation(location);
     const requestedPage = safePage(page);
     const key = cacheKey(safeLocation, requestedPage);
@@ -338,7 +351,7 @@ export const server = createServer(async (request, response) => {
     let status = 502;
     if (error.message === "Payload too large") status = 413;
     else if (error.message === "Request timeout") status = 408;
-    else if (error instanceof SyntaxError || /Provide a five-digit|location is required/.test(error.message)) status = 400;
+    else if (error instanceof SyntaxError || /Provide a five-digit|location is required|Provide 1 to \d+ numeric animal ids/.test(error.message)) status = 400;
     else if (/not a recognized postalcode/i.test(error.message)) status = 400;
 
     console.error("[tabby-server]", {

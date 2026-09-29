@@ -5,9 +5,24 @@ import { locationFromBrowser } from "./location.js";
 const FRESH_MS = 5 * 60 * 1000;
 // A refresh replaces only the *seen* cards in the pool (kept unseen ones
 // survive), so waiting until most of the pool has been shown just means
-// fewer, chunkier fetches — there's no accuracy cost to waiting, unlike the
-// old time-based cutoff this replaced (see git history on STALE_MS).
+// fewer, chunkier fetches — and, unlike the old time-based cutoff this
+// replaced (see git history on STALE_MS), a refresh never fires off elapsed
+// time alone: that cutoff advanced `page` and walked users outward through
+// the server's radius ladder regardless of how much they'd actually browsed.
 const SEEN_REFRESH_RATIO = 0.85;
+// Waiting has one cost, though (issue #79): a light user can take weeks to
+// reach the seen ratio, and listings get adopted or removed in the meantime.
+// So a pool that hasn't been checked for MAX_POOL_AGE_MS gets its ids
+// revalidated against RescueGroups in a cheap request per 100 ids (see revalidatePool)
+// -- dead cards are dropped, every still-available unseen card is kept, and
+// `page` never advances. It fails open: any error just serves the cache as
+// before, and VALIDATE_RETRY_COOLDOWN_MS keeps a down server from delaying
+// every new tab (each attempt can block the first render for up to
+// VALIDATE_TIMEOUT_MS).
+const MAX_POOL_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const VALIDATE_TIMEOUT_MS = 2000;
+const VALIDATE_RETRY_COOLDOWN_MS = 60 * 60 * 1000;
+const VALIDATE_BATCH_SIZE = 100; // the server's per-request id cap
 // RescueGroups' photo height/width ratio is a continuous spread, not two
 // clusters (sampled live across 5 metros: ~52% land in 0.9-1.1, but the
 // portrait side alone stretches from 1.1 to 2.3+ with no natural gap) — a
@@ -897,9 +912,84 @@ function mergeCards(keptCards, incomingCards, excludeIds = []) {
   return [...keptCards, ...freshCards];
 }
 
-async function refresh(location, locationLabel) {
+// When a pool's cards were last known to be available. Falls back to
+// fetchedAt for caches written before validatedAt existed. Null if neither is
+// a usable timestamp (nothing sensible to compare against).
+function poolValidatedAt(feedCache) {
+  const stamp = feedCache?.validatedAt ?? feedCache?.fetchedAt;
+  return Number.isFinite(stamp) ? stamp : null;
+}
+
+function poolNeedsRevalidation(feedCache) {
+  if (!feedCache?.cards?.length) return false;
+  const validatedAt = poolValidatedAt(feedCache);
+  if (validatedAt === null) return false;
+  const now = Date.now();
+  return now - validatedAt >= MAX_POOL_AGE_MS && now >= (Number(feedCache.validationRetryAfter) || 0);
+}
+
+async function fetchAvailableIds(ids, signal) {
+  const backendUrl = BACKEND_URL.replace(/\/$/, "");
+  const response = await fetch(`${backendUrl}/api/validate-cats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }), signal });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Could not validate cats.");
+  const { availableIds } = await response.json();
+  if (!Array.isArray(availableIds)) throw new Error("Malformed validation response.");
+  return availableIds.map(String);
+}
+
+// The cache as it is in storage right now, falling back to the copy this
+// tab read earlier -- another tab may have refreshed it while a validation
+// request was in flight, and writing back a stale copy would undo that.
+async function latestPool(fallback) {
   const { feedCache } = await storageGet(["feedCache"]);
-  const isRepeatLocation = sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
+  return feedCache?.cards?.length ? feedCache : fallback;
+}
+
+// Drops the cached cards RescueGroups no longer lists as available. Returns
+// `{ feedCache, allGone }` and never throws. `allGone` means every card in the
+// pool is dead: nothing is written (the caller should refresh from scratch
+// instead, which replaces the pool only if that fetch succeeds). Zero
+// survivors is trusted rather than treated as a glitch, because the
+// alternative -- serving a pool known to be dead -- is the bug being fixed.
+async function revalidatePool(feedCache) {
+  if (navigator.onLine === false) return { feedCache, allGone: false };
+  try {
+    const checkedIds = [...new Set(feedCache.cards.map((card) => card.id))];
+    const signal = AbortSignal.timeout(VALIDATE_TIMEOUT_MS);
+    const availableIds = new Set();
+    for (let i = 0; i < checkedIds.length; i += VALIDATE_BATCH_SIZE) {
+      (await fetchAvailableIds(checkedIds.slice(i, i + VALIDATE_BATCH_SIZE), signal)).forEach((id) => availableIds.add(id));
+    }
+    const goneIds = new Set(checkedIds.filter((id) => !availableIds.has(id)));
+
+    // Only ids that were actually checked can be dropped, so a card another
+    // tab added in the meantime is left alone.
+    const base = await latestPool(feedCache);
+    const survivors = base.cards.filter((card) => !goneIds.has(card.id));
+    if (!survivors.length) return { feedCache: base, allGone: true };
+
+    const pruned = { ...base, cards: survivors, seenIds: getSeenIds(base).filter((id) => !goneIds.has(id)), validatedAt: Date.now() };
+    delete pruned.validationRetryAfter;
+    await storageSet({ feedCache: pruned });
+    return { feedCache: pruned, allGone: false };
+  } catch (error) {
+    console.error("[tabby]", error);
+    try {
+      const failed = { ...(await latestPool(feedCache)), validationRetryAfter: Date.now() + VALIDATE_RETRY_COOLDOWN_MS };
+      await storageSet({ feedCache: failed });
+      return { feedCache: failed, allGone: false };
+    } catch {
+      return { feedCache, allGone: false };
+    }
+  }
+}
+
+// `discardPool` is for a pool revalidation found entirely dead: it refreshes
+// as if there were no prior cache (page 1, nothing kept), and since nothing is
+// written until the fetch succeeds, a failed attempt leaves the old cache as-is.
+async function refresh(location, locationLabel, { discardPool = false } = {}) {
+  const { feedCache } = await storageGet(["feedCache"]);
+  const isRepeatLocation = !discardPool && sameLocation(feedCache?.location, location) && Boolean(feedCache?.cards?.length);
   const priorSeenIds = isRepeatLocation ? getSeenIds(feedCache) : [];
   // Only the *seen* cards are dropped on a refresh — whatever the user
   // hasn't looked at yet survives and is topped up with new cards below,
@@ -925,7 +1015,12 @@ async function refresh(location, locationLabel) {
     mergedCards = mergeCards(keptUnseenCards, feed.cards || []);
   }
 
-  const nextCache = { cards: mergedCards, fetchedAt: Date.now(), radiusMiles: feed.radiusMiles || feedCache?.radiusMiles || 0, location, page, seenIds: [] };
+  // Kept unseen cards are older than this fetch, so the pool as a whole is
+  // only as recently validated as they were -- resetting validatedAt to now
+  // here (as fetchedAt is) would hide their age from poolNeedsRevalidation().
+  const fetchedAt = Date.now();
+  const validatedAt = keptUnseenCards.length ? (poolValidatedAt(feedCache) ?? fetchedAt) : fetchedAt;
+  const nextCache = { cards: mergedCards, fetchedAt, validatedAt, radiusMiles: feed.radiusMiles || feedCache?.radiusMiles || 0, location, page, seenIds: [] };
   await storageSet({ feedCache: nextCache });
   if (!mergedCards.length) {
     setCardVisible(false);
@@ -946,7 +1041,14 @@ async function refresh(location, locationLabel) {
 
 async function _start({ requestLocation = false } = {}) {
   setCardVisible(false);
-  const { settings = { postalcode: "", location: null }, feedCache } = await storageGet(["settings", "feedCache"]);
+  const { settings = { postalcode: "", location: null }, feedCache: storedCache } = await storageGet(["settings", "feedCache"]);
+  let feedCache = storedCache;
+  let poolIsDead = false;
+  if (poolNeedsRevalidation(feedCache)) {
+    const revalidated = await revalidatePool(feedCache);
+    feedCache = revalidated.feedCache;
+    poolIsDead = revalidated.allGone;
+  }
   const resolvedSettings = {
     postalcode: settings.postalcode || "",
     location: settings.location || null
@@ -954,8 +1056,8 @@ async function _start({ requestLocation = false } = {}) {
   const locationLabel = resolvedSettings.postalcode ? `from ${resolvedSettings.postalcode}` : "from you";
   const age = feedCache ? Date.now() - feedCache.fetchedAt : Infinity;
   const seenRatio = feedCache?.cards?.length ? getSeenIds(feedCache).length / feedCache.cards.length : 1;
-  const shouldRefresh = !feedCache?.cards?.length || (age >= FRESH_MS && seenRatio >= SEEN_REFRESH_RATIO);
-  if (feedCache?.cards?.length) {
+  const shouldRefresh = poolIsDead || !feedCache?.cards?.length || (age >= FRESH_MS && seenRatio >= SEEN_REFRESH_RATIO);
+  if (feedCache?.cards?.length && !poolIsDead) {
     const { selected, nextSeenIds } = nextCard(feedCache.cards, getSeenIds(feedCache));
     await storageSet({ feedCache: { ...feedCache, seenIds: nextSeenIds } });
     renderCard(selected, { stale: shouldRefresh, locationLabel });
@@ -972,7 +1074,7 @@ async function _start({ requestLocation = false } = {}) {
   }
   $("location-panel").hidden = true;
   if (shouldRefresh) {
-    try { await refresh(location, locationLabel); } catch (error) {
+    try { await refresh(location, locationLabel, { discardPool: poolIsDead }); } catch (error) {
       console.error("[tabby]", error);
       if (navigator.onLine === false) {
         showNotice(OFFLINE_MESSAGE, { type: "error" });
