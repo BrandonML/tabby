@@ -1,6 +1,6 @@
 # Privacy Policy for Tabby
 
-_Last updated: 2026-09-22_
+_Last updated: 2026-09-29_
 
 Tabby ("the extension") replaces your new tab page with one real, adoptable cat sourced from [RescueGroups.org](https://rescuegroups.org). It's the same extension package on both the Chrome Web Store and Edge Add-ons, and this policy applies to both. This policy explains what data Tabby collects, how it's used, and how it's stored.
 
@@ -14,17 +14,17 @@ Tabby does not collect your name, email address, browsing history, or any other 
 
 ## How Data Is Used
 
-Your location or ZIP code is sent to Tabby's own backend server, which uses it to search RescueGroups.org for adoptable cats near that location. Nothing else is sent — no browsing history, no device identifiers, no data from other tabs or sites.
+Your location or ZIP code is sent to Tabby's own backend server, which uses it to search RescueGroups.org for adoptable cats near that location. Separately, at most about once a week, Tabby sends the public listing IDs of the cats it has cached on your device (not your location, and nothing that identifies you) to the same backend, which passes them to RescueGroups.org to check whether those listings are still available so removed ones can be dropped. The backend does not store them. Nothing else is sent — no browsing history, no device identifiers, no data from other tabs or sites.
 
 ## How Data Is Stored
 
-Your location/ZIP code and the most recently fetched batch of cat listings are stored locally on your device, using the browser's local extension storage (`chrome.storage.local` — the same API on both Chrome and Edge, since Edge is Chromium-based). This data is **not** synced to Google's, Microsoft's, or any other cloud service, and never leaves your device except for the single search request described above.
+Your location/ZIP code and the most recently fetched batch of cat listings are stored locally on your device, using the browser's local extension storage (`chrome.storage.local` — the same API on both Chrome and Edge, since Edge is Chromium-based). This data is **not** synced to Google's, Microsoft's, or any other cloud service, and never leaves your device except for the search request and the periodic availability check described above.
 
 On the server side, Tabby's backend keeps a short-lived (a few minutes) cache of search results, keyed only by a rounded location and page number — never by anything that identifies you personally, such as an IP address, account, or device ID. This cache exists purely to avoid making duplicate requests to RescueGroups.org and is not linked to you as an individual.
 
 ## Third-Party Services
 
-Tabby's backend queries the [RescueGroups.org](https://rescuegroups.org) public API to find adoptable cats. Your search location (ZIP code or coordinates) is sent to RescueGroups.org as part of that search — this is the only third party that ever receives your location, and only for the purpose of returning matching adoptable-cat listings. See [RescueGroups.org's own privacy policy](https://rescuegroups.org/privacy-policy/) for how they handle that request.
+Tabby's backend queries the [RescueGroups.org](https://rescuegroups.org) public API to find adoptable cats. Your search location (ZIP code or coordinates) is sent to RescueGroups.org as part of that search — this is the only third party that ever receives your location, and only for the purpose of returning matching adoptable-cat listings. It also receives the public listing IDs described above, with no location attached, to confirm those listings are still available. See [RescueGroups.org's own privacy policy](https://rescuegroups.org/privacy-policy/) for how they handle that request.
 
 Tabby also uses Chrome Web Store's built-in GA4 analytics, as described above — this collects only basic, aggregate usage metrics, not your location or any other data described in this policy. Tabby does not use any advertising or crash-reporting service. No data is sold, rented, or shared with any party other than RescueGroups.org and Google/Chrome Web Store as described in this policy.
 

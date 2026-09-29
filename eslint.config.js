@@ -43,7 +43,7 @@ export default [
     rules: securityRules
   },
   {
-    files: ["test/**/*.js", "test-live/**/*.js"],
+    files: ["test/**/*.js", "test-live/**/*.js", "test-support/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

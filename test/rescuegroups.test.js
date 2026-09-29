@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSearchRequest, normalizeCards, validateLocation, searchRadius, findNearbyCats } from "../server/rescuegroups.js";
+import { buildSearchRequest, normalizeCards, validateLocation, searchRadius, findNearbyCats, validateAnimalIds, buildAvailabilityRequest, findAvailableIds } from "../server/rescuegroups.js";
 
 test("ZIP fallback uses RescueGroups native postalcode radius filter", () => {
   const request = buildSearchRequest({ postalcode: "33629" }, 25);
@@ -518,4 +518,78 @@ test("searchRadius returns normalized cards on successful response", async () =>
 
   const body = JSON.parse(fetchOptions.body);
   assert.deepEqual(body, { data: { filterRadius: { postalcode: "33629", miles: 25 } } });
+});
+
+// Issue #79: revalidating specific cached listings by id.
+
+test("validateAnimalIds accepts numeric strings and numbers, de-duplicated, as strings", () => {
+  assert.deepEqual(validateAnimalIds(["101", 202, "101"]), ["101", "202"]);
+});
+
+test("validateAnimalIds rejects anything that isn't 1-100 numeric ids", () => {
+  const message = /Provide 1 to 100 numeric animal ids\./;
+  assert.throws(() => validateAnimalIds(undefined), message);
+  assert.throws(() => validateAnimalIds("101"), message);
+  assert.throws(() => validateAnimalIds([]), message);
+  assert.throws(() => validateAnimalIds(Array.from({ length: 101 }, (_, i) => String(i + 1))), message);
+  assert.throws(() => validateAnimalIds(["101", "abc"]), message);
+  assert.throws(() => validateAnimalIds(["101", "12 34"]), message);
+  assert.throws(() => validateAnimalIds(["1; DROP"]), message);
+  assert.throws(() => validateAnimalIds(["101", null]), message);
+  assert.throws(() => validateAnimalIds([{ id: "101" }]), message);
+  assert.throws(() => validateAnimalIds(["1234567890123"]), message, "an id longer than 12 digits is not a real RescueGroups id");
+  assert.equal(validateAnimalIds(Array.from({ length: 100 }, (_, i) => String(i + 1))).length, 100, "exactly 100 is allowed");
+});
+
+test("buildAvailabilityRequest filters the available-cats endpoint by animals.id, one page of up to 100", () => {
+  const request = buildAvailabilityRequest(["101", "202"]);
+  const url = new URL(request.url);
+  assert.match(url.pathname, /\/public\/animals\/search\/available\/cats\/haspic\/$/);
+  assert.equal(url.searchParams.get("limit"), "100");
+  assert.equal(url.searchParams.get("page"), "1");
+  assert.equal(url.searchParams.get("fields[animals]"), "name", "only the id is needed, so keep the payload minimal");
+  assert.deepEqual(request.body, { data: { filters: [{ fieldName: "animals.id", operation: "equal", criteria: ["101", "202"] }] } });
+});
+
+test("findAvailableIds returns only the requested ids RescueGroups still lists", async () => {
+  let sent;
+  const fetchImpl = async (url, options) => {
+    sent = { url, options };
+    return { ok: true, status: 200, json: async () => ({ data: [{ id: "101" }, { id: 303 }] }) };
+  };
+  const result = await findAvailableIds(["101", "202", "303"], { apiKey: "test", fetchImpl });
+  assert.deepEqual(result, ["101", "303"], "202 wasn't returned, so it's no longer available");
+  assert.equal(sent.options.method, "POST");
+  assert.equal(sent.options.headers.Authorization, "test");
+});
+
+test("findAvailableIds ignores ids in the response that weren't asked about", async () => {
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ data: [{ id: "101" }, { id: "999" }] }) });
+  assert.deepEqual(await findAvailableIds(["101"], { apiKey: "test", fetchImpl }), ["101"]);
+});
+
+test("findAvailableIds returns an empty list when nothing is still available, without treating it as an error", async () => {
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) });
+  assert.deepEqual(await findAvailableIds(["101"], { apiKey: "test", fetchImpl }), []);
+  const noDataFetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  assert.deepEqual(await findAvailableIds(["101"], { apiKey: "test", fetchImpl: noDataFetch }), []);
+});
+
+test("findAvailableIds rejects bad ids before touching the network, even with no API key configured", async () => {
+  let called = false;
+  const fetchImpl = async () => { called = true; };
+  await assert.rejects(findAvailableIds(["nope"], { apiKey: "test", fetchImpl }), /Provide 1 to 100 numeric animal ids/);
+  await assert.rejects(findAvailableIds(["nope"], { fetchImpl }), /Provide 1 to 100 numeric animal ids/);
+  assert.equal(called, false);
+});
+
+test("findAvailableIds requires an API key", async () => {
+  await assert.rejects(findAvailableIds(["101"], { fetchImpl: async () => ({}) }), /RG_API_KEY is not configured/);
+});
+
+test("findAvailableIds surfaces RescueGroups HTTP errors and malformed bodies like searchRadius does", async () => {
+  const httpError = async () => ({ ok: false, status: 429, json: async () => ({ errors: [{ detail: "Rate limited." }] }) });
+  await assert.rejects(findAvailableIds(["101"], { apiKey: "test", fetchImpl: httpError }), /RescueGroups HTTP 429: Rate limited\./);
+  const malformed = async () => ({ ok: true, status: 200, json: async () => null });
+  await assert.rejects(findAvailableIds(["101"], { apiKey: "test", fetchImpl: malformed }), /empty or malformed response body/);
 });
