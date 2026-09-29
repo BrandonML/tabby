@@ -12,13 +12,15 @@ Steps to ship a change to `main`, which auto-deploys the server to Northflank, a
 - [ ] Exception: if several feature branches are ready to ship together, merge them all into a shared `dev` branch first, then open one PR from `dev` into `main`. Use this only when bundling multiple branches — a single feature branch goes straight to `main`.
 - [ ] Bump `manifest.json`/`package.json` to the new version and add a row to [README.md](README.md)'s Version History table, as a commit on the same branch/PR — this is what `tag-release.yml` reads post-merge, so it needs to land in the same merge as the change it describes rather than as a follow-up.
 - [ ] Documentation currency check (see AGENTS.md's "Documentation & Asset Currency"): does this release make README.md, this file, or `webstore/WEBSTORE.md` (copy or screenshots/promo assets) inaccurate? Fix small stuff directly in this PR. For a larger asset-generation task (e.g. regenerating screenshots), don't block the release on it — file a tracking issue instead and note it in the PR description, the way [issue #66](https://github.com/BrandonML/tabby/issues/66) tracks the icon-menu change making the screenshot harness stale.
+- [ ] Run `npm run test:live` locally with a real `RG_API_KEY` in `.env` and confirm it passes. It's excluded from CI by design (it needs the real key and hits the real RescueGroups API), so nothing else checks that the pagination/radius contract, the by-id availability query, and the stale-cache revalidation flow still work against the real service.
+- [ ] Manual QA in a real browser, per AGENTS.md's Manual QA Checklist (load unpacked, cards render, settings save/close, no console errors in the service worker or new-tab page). If the release touches the cache or revalidation logic, also run the old-cache simulation in [README.md](README.md)'s "Manual QA: simulating an old cache" section.
 - [ ] Wait for the `test` check to go green. If it's red, stop — do not merge.
 - [ ] Merge the PR.
 
 ## 3. Post-merge (fully automated — just watch)
 
 - [ ] `.github/workflows/tag-release.yml` tags the commit `v<version>` (read from `manifest.json`). Check the repo's Tags page.
-- [ ] `.github/workflows/deploy-verify.yml` polls the live server's `/healthz` until it reports this exact commit's SHA (`NF_DEPLOYMENT_SHA`, injected by Northflank), then smoke-tests `/api/nearby-cats`, `/api/photo-thumb`, and `/api/photo-share` against production. **A green run is the signal that it's safe to proceed to store submission.** If it goes red or times out, stop and check the `tabby` service's build/deploy status directly on Northflank before doing anything else.
+- [ ] `.github/workflows/deploy-verify.yml` polls the live server's `/healthz` until it reports this exact commit's SHA (`NF_DEPLOYMENT_SHA`, injected by Northflank), then smoke-tests `/api/nearby-cats`, `/api/validate-cats`, `/api/photo-thumb`, and `/api/photo-share` against production. **A green run is the signal that it's safe to proceed to store submission.** If it goes red or times out, stop and check the `tabby` service's build/deploy status directly on Northflank before doing anything else.
 
 ## 4. Store submission (manual — both stores require a human in their dashboard)
 

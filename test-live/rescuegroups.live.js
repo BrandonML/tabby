@@ -136,7 +136,7 @@ describe("RescueGroups live by-id availability contract", () => {
     }).then((response) => response.json());
     const realIds = idsOf(seed).slice(0, 20);
     assert.ok(realIds.length >= 5, "need a handful of real available ids to test with");
-    const fakeIds = ["99999991", "99999992"];
+    const fakeIds = ["999999999991", "999999999992"];
 
     const availableIds = await findAvailableIds([...realIds, ...fakeIds], { apiKey: API_KEY });
 

@@ -63,9 +63,9 @@ This bumps `manifest.json`/`package.json` to the given version and zips `manifes
 
 Three GitHub Actions workflows automate the release process end to end — see [RELEASE.md](RELEASE.md) for the step-by-step runbook:
 
-- **`ci.yml`** — runs `npm test` on every push and pull request to `main`/`dev`, pinned to Node 22 to match the Dockerfile. `main` has a ruleset (Settings → Rules → Rulesets) requiring this check to pass and requiring a pull request before merging — the workflow alone doesn't block anything, only the ruleset does.
+- **`ci.yml`** — runs `npm run lint` and `npm test` on every push and pull request to `main`/`dev`, pinned to Node 22 to match the Dockerfile. `main` has a ruleset (Settings → Rules → Rulesets) requiring this check to pass and requiring a pull request before merging — the workflow alone doesn't block anything, only the ruleset does.
 - **`tag-release.yml`** — on every push to `main`, tags the commit `v<version>` (read from `manifest.json`) if that tag doesn't already exist. Idempotent, so it's safe to fire on every push rather than needing to detect "was this actually a release."
-- **`deploy-verify.yml`** — on every push to `main` that touches `server/**` or `Dockerfile` (mirroring the `tabby` service's own Northflank build trigger), polls the live `/healthz` endpoint until its `sha` field (see below) matches the pushed commit, then smoke-tests `/api/nearby-cats`, `/api/photo-thumb`, and `/api/photo-share` against production. A **green run is the signal that it's safe to build and submit the release to CWS/EWS** — since Northflank deploys in minutes and store review takes hours, the server is always live and correct well before any user's browser updates to a new extension version, as long as server changes stay additive/backward-compatible with whatever extension version is still in the wild.
+- **`deploy-verify.yml`** — on every push to `main` that touches `server/**` or `Dockerfile` (mirroring the `tabby` service's own Northflank build trigger), polls the live `/healthz` endpoint until its `sha` field (see below) matches the pushed commit, then smoke-tests `/api/nearby-cats`, `/api/validate-cats`, `/api/photo-thumb`, and `/api/photo-share` against production. A **green run is the signal that it's safe to build and submit the release to CWS/EWS** — since Northflank deploys in minutes and store review takes hours, the server is always live and correct well before any user's browser updates to a new extension version, as long as server changes stay additive/backward-compatible with whatever extension version is still in the wild.
 
 `/healthz` reports `{ status: "ok", sha }`, where `sha` is Northflank's auto-injected `NF_DEPLOYMENT_SHA` runtime env var (the exact git commit of the running build) — `null` locally, where that variable is never set. This is what lets `deploy-verify.yml` confirm the *new* code is actually live, not just that some process answered the health check.
 
@@ -92,10 +92,25 @@ npm.cmd test
 
 Both run in CI as part of the same required `test` check; a lint failure blocks merge exactly like a test failure. Linting is `eslint.config.js`, no separate config file per directory — it enforces `no-eval`/`no-implied-eval`/`no-new-func`/`no-script-url` repo-wide (see AGENTS.md's "Security-First Coding") on top of `eslint:recommended`, deliberately without a formatter (no Prettier) or stylistic rules beyond that.
 
-Run the live RescueGroups integration test once against the real API before merging any change to search radius, pagination, or the RescueGroups query contract, to confirm the pagination contract still holds. It requires a real `RG_API_KEY` (loaded from `.env`, same as `start:server`) and is excluded from `npm test`/CI by design:
+Run the live tests against the real API before every release (see [RELEASE.md](RELEASE.md)) and before merging any change to search radius, pagination, or the RescueGroups query contract. `test:live` runs everything in `test-live/`: the pagination/radius contract and the by-id availability contract (`rescuegroups.live.js`), and the stale-cache revalidation flow end to end (`stale-cache.live.js`, which starts the real server in-process and drives the real `newtab.js` against the real API, so nothing needs to be running first). It requires a real `RG_API_KEY` (loaded from `.env`, same as `start:server`) and is excluded from `npm test`/CI by design:
 
 ```powershell
 npm.cmd run test:live
 ```
+
+`npm test` also includes `test/revalidation-integration.test.js`, which runs the real `newtab.js` (jsdom) against the real server with only RescueGroups faked, so the extension/server contract is covered in CI and not just each half against a mock of the other; `test-support/` holds the harness it shares with the live suite. `test/deploy-coverage.test.js` fails if a server route is added without a `deploy-verify.yml` smoke check and a mention here and in RELEASE.md, or if a file in `test-live/` isn't wired into `test:live`.
+
+### Manual QA: simulating an old cache
+
+The stale-cache check (issue #79) only fires for a cache that's 7+ days old, so seeing it in a real browser means aging one by hand. With the unpacked extension loaded and `npm run start:server` running on this branch, open a new tab, press F12, and in the console (type `allow pasting` first if Chrome asks):
+
+```js
+const { feedCache } = await chrome.storage.local.get("feedCache");
+const old = Date.now() - 8 * 24 * 60 * 60 * 1000;
+const fake = { ...feedCache.cards[0], id: "999999999999", name: "FAKE DEAD CAT" };
+await chrome.storage.local.set({ feedCache: { ...feedCache, cards: [fake, ...feedCache.cards], fetchedAt: old, validatedAt: old } });
+```
+
+Reload the tab. The Network tab should show one `POST /api/validate-cats`, "FAKE DEAD CAT" must never appear, and re-reading `feedCache` should show it gone with `page` unchanged, `fetchedAt` still 8 days old, and `validatedAt` about now. Also worth trying: stop the server first (a cat should still render with no notice, and `validationRetryAfter` should be set about an hour out), and set a few unseen cards' `imageUrl` to a bogus URL (a broken photo should skip ahead silently).
 
 The project design follows the architecture document in the parent workspace. The API key is intentionally absent from all source files.
