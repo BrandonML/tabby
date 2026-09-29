@@ -232,25 +232,164 @@ describe('newtab.js DOM manipulation', () => {
     });
   });
 
-  describe('photo load failure (issue #69)', () => {
-    it('shows the generic "photo unavailable" notice when the image fails to load while online', () => {
-      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
-      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
-
+  describe('photo load failure (issues #69, #79)', () => {
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+    const failPhoto = async () => {
       document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+      await tick();
+    };
+    const shownName = () => document.querySelector('#card h1').textContent;
+    const catPool = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, name: `Cat${i}`, imageUrl: `https://image.org/${i}.jpg` }));
+
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    });
+
+    it('shows the generic "photo unavailable" notice when the image fails and there is no other card to show', async () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+      await failPhoto();
 
       assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
     });
 
-    it('shows an offline-specific notice when the image fails to load while offline', () => {
-      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+    it('shows an offline-specific notice when the image fails to load while offline', async () => {
       Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
-      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+      await failPhoto();
 
       const noticeText = document.getElementById('notice').textContent;
       assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
       assert.ok(!noticeText.includes('no longer available'), 'should not show the generic missing-photo message while offline');
+    });
+
+    it('does not skip ahead through the pool while offline', async () => {
+      const cards = catPool(3);
+      let poolRead = false;
+      window.chrome.storage.local.get = async (keys) => {
+        if (keys.includes('feedCache')) poolRead = true;
+        return { feedCache: { cards, seenIds: ['c0'], location: { postalcode: '12345' } } };
+      };
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.renderCard(cards[0]);
+
+      await failPhoto();
+
+      assert.equal(poolRead, false, 'offline failures should not touch the pool');
+      assert.equal(shownName(), 'Cat0');
+    });
+
+    it('moves on to another unseen card, and marks it seen, when a photo fails', async () => {
+      const cards = catPool(3);
+      let savedCache;
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0'], location: { postalcode: '12345' }, page: 2, fetchedAt: 123 } });
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      window.renderCard(cards[0], { locationLabel: 'from 12345' });
+
+      await failPhoto();
+
+      assert.ok(['Cat1', 'Cat2'].includes(shownName()), `expected an unseen replacement, got ${shownName()}`);
+      assert.equal(document.getElementById('notice').textContent, '', 'a successful skip should not show the notice');
+      assert.equal(savedCache.seenIds.length, 2);
+      assert.ok(savedCache.seenIds.includes('c0'));
+      assert.equal(savedCache.page, 2, 'only seenIds should change');
+      assert.equal(savedCache.fetchedAt, 123);
+      assert.equal(savedCache.cards.length, 3, 'the failed card is not evicted, just already-seen');
+    });
+
+    it('keeps the distance basis label on the replacement card', async () => {
+      const cards = [{ id: 'a', name: 'A', imageUrl: 'https://image.org/a.jpg', distanceMiles: 1 }, { id: 'b', name: 'B', imageUrl: 'https://image.org/b.jpg', distanceMiles: 2 }];
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['a'] } });
+      window.renderCard(cards[0], { locationLabel: 'from 97703' });
+
+      await failPhoto();
+
+      assert.equal(shownName(), 'B');
+      assert.equal(document.querySelector('.distance').textContent, '2.0 mi away from 97703');
+    });
+
+    it('shows the notice instead of recycling a seen card when nothing unseen is left', async () => {
+      const cards = catPool(2);
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0', 'c1'] } });
+      window.renderCard(cards[0]);
+
+      await failPhoto();
+
+      assert.equal(shownName(), 'Cat0');
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('gives up with the notice after three consecutive broken photos', async () => {
+      const cards = catPool(8);
+      let seenIds = ['c0'];
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds } });
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) seenIds = val.feedCache.seenIds; };
+      window.renderCard(cards[0]);
+
+      for (let i = 0; i < 3; i++) {
+        await failPhoto();
+        assert.equal(document.getElementById('notice').textContent, '', `skip ${i + 1} should be silent`);
+      }
+      assert.equal(seenIds.length, 4, 'original + three replacements shown');
+
+      await failPhoto(); // the fourth broken photo in a row
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+      assert.equal(seenIds.length, 4, 'no fifth card should have been tried');
+    });
+
+    it('does not act on a stale photo whose card has already been replaced', async () => {
+      const cards = catPool(3);
+      let setCalls = 0;
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0'] } });
+      window.chrome.storage.local.set = async () => { setCalls++; };
+      window.renderCard(cards[0]);
+      const staleImg = document.querySelector('.photo');
+      window.renderCard(cards[1]); // e.g. a refresh landed first
+
+      staleImg.dispatchEvent(new window.Event('error'));
+      await tick();
+
+      assert.equal(shownName(), 'Cat1');
+      assert.equal(setCalls, 0);
+      assert.equal(document.getElementById('notice').textContent, '');
+    });
+
+    it('falls back to the notice if reading the pool throws', async () => {
+      const originalError = console.error;
+      console.error = () => {};
+      try {
+        window.chrome.storage.local.get = async (keys) => {
+          if (keys.includes('feedCache')) throw new Error('storage unavailable');
+          return {};
+        };
+        window.renderCard({ id: 'c0', name: 'Cat0', imageUrl: 'https://image.org/0.jpg' });
+
+        await failPhoto();
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('cycles within the explore batch, without a new fetch or touching feedCache', async () => {
+      const cards = catPool(3);
+      let fetchCount = 0;
+      let feedCacheWrites = 0;
+      window.fetch = async () => { fetchCount++; return { ok: true, json: async () => ({ cards, radiusMiles: 25 }) }; };
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) feedCacheWrites++; };
+      await window.exploreArea();
+      assert.equal(fetchCount, 1);
+      const firstShown = shownName();
+
+      await failPhoto();
+
+      assert.notEqual(shownName(), firstShown, 'moved on to another explore card');
+      assert.equal(fetchCount, 1);
+      assert.equal(feedCacheWrites, 0);
+      assert.equal(document.getElementById('explore-banner').hidden, false);
     });
   });
 

@@ -50,6 +50,9 @@ const PHOTO_SHARE_TIMEOUT_MS = 6000;
 // gets its own message; a false "online" reading just falls through to the
 // existing per-context error handling unchanged.
 const OFFLINE_MESSAGE = "You're offline. Reconnect and refresh to keep browsing cats.";
+// Issue #79: how many replacement cards a run of broken photos may skip
+// through before giving up and showing the "no longer available" notice.
+const MAX_PHOTO_FALLBACKS = 3;
 const TABBY_CWS_URL = "https://chromewebstore.google.com/detail/tabby-new-tab-for-adoptab/elfpnkoboidkgahmoggodpnmekfodcig";
 const TABBY_EDGE_URL = "https://microsoftedge.microsoft.com/addons/detail/fieeoalehgckgnkohkdblljmgaemaiho";
 const TABBY_TAGLINE = "Meet an adoptable cat every time you open a new tab.";
@@ -397,19 +400,56 @@ function buildSaveButton(card) {
   return button;
 }
 
-function nextCard(cards, seenIds = []) {
+// Returns null (rather than recycling a seen card) when nothing unseen is left.
+function nextUnseenCard(cards, seenIds = []) {
   const seenSet = new Set(seenIds);
   const unseenCards = cards.filter((card) => !seenSet.has(card.id));
-  if (unseenCards.length) {
-    const selected = randomCard(unseenCards);
-    seenSet.add(selected.id);
-    return { selected, nextSeenIds: [...seenSet] };
-  }
+  if (!unseenCards.length) return null;
+  const selected = randomCard(unseenCards);
+  seenSet.add(selected.id);
+  return { selected, nextSeenIds: [...seenSet] };
+}
+
+function nextCard(cards, seenIds = []) {
+  const unseenPick = nextUnseenCard(cards, seenIds);
+  if (unseenPick) return unseenPick;
   const selected = randomCard(cards);
   return { selected, nextSeenIds: [selected.id] };
 }
 
-function renderCard(card, { stale = false, exploreLabel = null, locationLabel = null } = {}) {
+// Issue #79: a broken photo used to leave a card on screen with a broken-image
+// icon and a notice. The card was already marked seen when it was picked, so
+// moving on needs no storage change beyond marking the replacement seen too.
+// Returns true when there is nothing more for the caller to do (a replacement
+// was rendered, or this photo's card is no longer the one on screen), false
+// when no unseen replacement exists and the notice should show instead.
+async function showNextCardAfterPhotoError(img, { exploreLabel, locationLabel, fallbacksLeft }) {
+  // A refresh may be rewriting feedCache right now; let it finish so this
+  // read-modify-write can't clobber its result. (If it replaces the card on
+  // screen in the meantime, the check below notices and stands down.)
+  if (inFlight) await inFlight.catch(() => {});
+  if (!img.isConnected) return true;
+
+  if (exploreLabel) {
+    if (!exploreBatch || exploreBatch.label !== exploreLabel) return false;
+    const pick = nextUnseenCard(exploreBatch.cards, exploreBatch.seenIds);
+    if (!pick) return false;
+    exploreBatch = { ...exploreBatch, seenIds: pick.nextSeenIds };
+    renderCard(pick.selected, { exploreLabel, locationLabel, fallbacksLeft });
+    return true;
+  }
+
+  const { feedCache } = await storageGet(["feedCache"]);
+  if (!feedCache?.cards?.length) return false;
+  const pick = nextUnseenCard(feedCache.cards, getSeenIds(feedCache));
+  if (!pick) return false;
+  await storageSet({ feedCache: { ...feedCache, seenIds: pick.nextSeenIds } });
+  if (!img.isConnected) return true;
+  renderCard(pick.selected, { locationLabel, fallbacksLeft });
+  return true;
+}
+
+function renderCard(card, { stale = false, exploreLabel = null, locationLabel = null, fallbacksLeft = MAX_PHOTO_FALLBACKS } = {}) {
   closeShareMenu(); // a card rebuild (e.g. "Show another cat") orphans any open menu -- close it first
   const meta = [card.breed, card.age, card.sex].filter(Boolean).join(" · ");
   // While exploring, distanceMiles is measured from the explored city, not
@@ -447,9 +487,21 @@ function renderCard(card, { stale = false, exploreLabel = null, locationLabel = 
   img.src = card.imageUrl;
   img.alt = card.name;
   img.referrerPolicy = "no-referrer";
-  img.addEventListener("error", () => {
-    const message = navigator.onLine === false ? OFFLINE_MESSAGE : "That photo is no longer available. Refresh to try another cat.";
-    showNotice(message, { type: "error" });
+  img.addEventListener("error", async () => {
+    // Offline means every photo would fail -- skipping ahead would just burn
+    // through the pool, so it keeps its own notice (issue #69).
+    if (navigator.onLine === false) {
+      showNotice(OFFLINE_MESSAGE, { type: "error" });
+      return;
+    }
+    if (fallbacksLeft > 0) {
+      try {
+        if (await showNextCardAfterPhotoError(img, { exploreLabel, locationLabel, fallbacksLeft: fallbacksLeft - 1 })) return;
+      } catch (error) {
+        console.error("[tabby]", error);
+      }
+    }
+    showNotice("That photo is no longer available. Refresh to try another cat.", { type: "error" });
   });
   img.addEventListener("load", () => {
     // A portrait-oriented photo (taller than wide) can't fill the card's
