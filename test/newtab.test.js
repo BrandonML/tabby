@@ -232,25 +232,164 @@ describe('newtab.js DOM manipulation', () => {
     });
   });
 
-  describe('photo load failure (issue #69)', () => {
-    it('shows the generic "photo unavailable" notice when the image fails to load while online', () => {
-      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
-      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
-
+  describe('photo load failure (issues #69, #79)', () => {
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+    const failPhoto = async () => {
       document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+      await tick();
+    };
+    const shownName = () => document.querySelector('#card h1').textContent;
+    const catPool = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, name: `Cat${i}`, imageUrl: `https://image.org/${i}.jpg` }));
+
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    });
+
+    it('shows the generic "photo unavailable" notice when the image fails and there is no other card to show', async () => {
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+
+      await failPhoto();
 
       assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
     });
 
-    it('shows an offline-specific notice when the image fails to load while offline', () => {
-      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
+    it('shows an offline-specific notice when the image fails to load while offline', async () => {
       Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.renderCard({ name: "Milo", imageUrl: "https://image.org/cat.jpg" });
 
-      document.querySelector('.photo').dispatchEvent(new window.Event('error'));
+      await failPhoto();
 
       const noticeText = document.getElementById('notice').textContent;
       assert.ok(noticeText.includes("offline"), `expected an offline-specific notice, got: ${noticeText}`);
       assert.ok(!noticeText.includes('no longer available'), 'should not show the generic missing-photo message while offline');
+    });
+
+    it('does not skip ahead through the pool while offline', async () => {
+      const cards = catPool(3);
+      let poolRead = false;
+      window.chrome.storage.local.get = async (keys) => {
+        if (keys.includes('feedCache')) poolRead = true;
+        return { feedCache: { cards, seenIds: ['c0'], location: { postalcode: '12345' } } };
+      };
+      Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+      window.renderCard(cards[0]);
+
+      await failPhoto();
+
+      assert.equal(poolRead, false, 'offline failures should not touch the pool');
+      assert.equal(shownName(), 'Cat0');
+    });
+
+    it('moves on to another unseen card, and marks it seen, when a photo fails', async () => {
+      const cards = catPool(3);
+      let savedCache;
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0'], location: { postalcode: '12345' }, page: 2, fetchedAt: 123 } });
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) savedCache = val.feedCache; };
+      window.renderCard(cards[0], { locationLabel: 'from 12345' });
+
+      await failPhoto();
+
+      assert.ok(['Cat1', 'Cat2'].includes(shownName()), `expected an unseen replacement, got ${shownName()}`);
+      assert.equal(document.getElementById('notice').textContent, '', 'a successful skip should not show the notice');
+      assert.equal(savedCache.seenIds.length, 2);
+      assert.ok(savedCache.seenIds.includes('c0'));
+      assert.equal(savedCache.page, 2, 'only seenIds should change');
+      assert.equal(savedCache.fetchedAt, 123);
+      assert.equal(savedCache.cards.length, 3, 'the failed card is not evicted, just already-seen');
+    });
+
+    it('keeps the distance basis label on the replacement card', async () => {
+      const cards = [{ id: 'a', name: 'A', imageUrl: 'https://image.org/a.jpg', distanceMiles: 1 }, { id: 'b', name: 'B', imageUrl: 'https://image.org/b.jpg', distanceMiles: 2 }];
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['a'] } });
+      window.renderCard(cards[0], { locationLabel: 'from 97703' });
+
+      await failPhoto();
+
+      assert.equal(shownName(), 'B');
+      assert.equal(document.querySelector('.distance').textContent, '2.0 mi away from 97703');
+    });
+
+    it('shows the notice instead of recycling a seen card when nothing unseen is left', async () => {
+      const cards = catPool(2);
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0', 'c1'] } });
+      window.renderCard(cards[0]);
+
+      await failPhoto();
+
+      assert.equal(shownName(), 'Cat0');
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('gives up with the notice after three consecutive broken photos', async () => {
+      const cards = catPool(8);
+      let seenIds = ['c0'];
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds } });
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) seenIds = val.feedCache.seenIds; };
+      window.renderCard(cards[0]);
+
+      for (let i = 0; i < 3; i++) {
+        await failPhoto();
+        assert.equal(document.getElementById('notice').textContent, '', `skip ${i + 1} should be silent`);
+      }
+      assert.equal(seenIds.length, 4, 'original + three replacements shown');
+
+      await failPhoto(); // the fourth broken photo in a row
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+      assert.equal(seenIds.length, 4, 'no fifth card should have been tried');
+    });
+
+    it('does not act on a stale photo whose card has already been replaced', async () => {
+      const cards = catPool(3);
+      let setCalls = 0;
+      window.chrome.storage.local.get = async () => ({ feedCache: { cards, seenIds: ['c0'] } });
+      window.chrome.storage.local.set = async () => { setCalls++; };
+      window.renderCard(cards[0]);
+      const staleImg = document.querySelector('.photo');
+      window.renderCard(cards[1]); // e.g. a refresh landed first
+
+      staleImg.dispatchEvent(new window.Event('error'));
+      await tick();
+
+      assert.equal(shownName(), 'Cat1');
+      assert.equal(setCalls, 0);
+      assert.equal(document.getElementById('notice').textContent, '');
+    });
+
+    it('falls back to the notice if reading the pool throws', async () => {
+      const originalError = console.error;
+      console.error = () => {};
+      try {
+        window.chrome.storage.local.get = async (keys) => {
+          if (keys.includes('feedCache')) throw new Error('storage unavailable');
+          return {};
+        };
+        window.renderCard({ id: 'c0', name: 'Cat0', imageUrl: 'https://image.org/0.jpg' });
+
+        await failPhoto();
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.ok(document.getElementById('notice').textContent.includes('no longer available'));
+    });
+
+    it('cycles within the explore batch, without a new fetch or touching feedCache', async () => {
+      const cards = catPool(3);
+      let fetchCount = 0;
+      let feedCacheWrites = 0;
+      window.fetch = async () => { fetchCount++; return { ok: true, json: async () => ({ cards, radiusMiles: 25 }) }; };
+      window.chrome.storage.local.set = async (val) => { if (val.feedCache) feedCacheWrites++; };
+      await window.exploreArea();
+      assert.equal(fetchCount, 1);
+      const firstShown = shownName();
+
+      await failPhoto();
+
+      assert.notEqual(shownName(), firstShown, 'moved on to another explore card');
+      assert.equal(fetchCount, 1);
+      assert.equal(feedCacheWrites, 0);
+      assert.equal(document.getElementById('explore-banner').hidden, false);
     });
   });
 
@@ -1526,13 +1665,16 @@ describe('newtab.js DOM manipulation', () => {
       assert.equal(card.querySelector('h1').textContent, 'CatFresh');
     });
 
-    it('does not refresh when under the seen-ratio threshold, no matter how old the cache is', async () => {
+    it('does not refresh when under the seen-ratio threshold, however old the cache is', async () => {
       window.chrome.storage.local.get = async () => ({
         settings: { postalcode: '12345', location: { lat: 1, lon: 2 } },
         feedCache: {
           cards: [{ id: '1', name: 'CatA' }, { id: '2', name: 'CatB' }],
-          // Very old — there's no hard time-based cutoff any more (removed
-          // along with STALE_MS; a refresh now only fires off the seen ratio).
+          // Old, but inside the 7-day revalidation window. A refresh (a new
+          // page of cats) never fires off elapsed time alone -- STALE_MS was
+          // removed for that reason; only the seen ratio triggers one. Age past
+          // 7 days triggers a separate, page-free revalidation instead (see
+          // 'stale pool revalidation' below).
           fetchedAt: Date.now() - (1000 * 60 * 60 * 24),
           seenIds: [] // 0 of 2 seen — well under the 85% refresh threshold
         }
@@ -1770,6 +1912,430 @@ describe('newtab.js DOM manipulation', () => {
 
       assert.strictEqual(p1, p2, "start() should return the same promise if one is in flight");
       await p1;
+    });
+  });
+
+  describe('stale pool revalidation (issue #79)', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const LOCATION = { lat: 1, lon: 2 };
+    const settings = { postalcode: '12345', location: LOCATION };
+    const cardsFor = (ids) => ids.map((id) => ({ id, name: `Cat${id}`, imageUrl: `https://image.org/${id}.jpg` }));
+    const poolCache = (overrides = {}) => ({
+      cards: cardsFor(['1', '2', '3']),
+      fetchedAt: Date.now() - 8 * DAY,
+      location: LOCATION,
+      page: 3,
+      radiusMiles: 25,
+      seenIds: [],
+      ...overrides
+    });
+
+    let store;
+    let calls; // { validate: [ids...], nearby: [body...] }
+    let availability; // ids the mocked server reports as still available, or a function/throwing behavior
+    let nearbyResponse;
+
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+      store = { settings };
+      calls = { validate: [], nearby: [] };
+      availability = () => []; // set per test
+      nearbyResponse = { cards: cardsFor(['fresh1', 'fresh2']), radiusMiles: 25 };
+      window.chrome.storage.local.get = async (keys) => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map((key) => [key, store[key]]));
+      window.chrome.storage.local.set = async (value) => { Object.assign(store, value); };
+      window.fetch = async (url, options) => {
+        const body = JSON.parse(options.body);
+        if (url.endsWith('/api/validate-cats')) {
+          calls.validate.push(body.ids);
+          const result = await availability(body.ids);
+          return result;
+        }
+        calls.nearby.push(body);
+        return { ok: true, json: async () => nearbyResponse };
+      };
+    });
+
+    const serverSays = (availableIds) => async () => ({ ok: true, json: async () => ({ availableIds }) });
+    const shownName = () => document.querySelector('#card h1')?.textContent;
+    const silenceConsoleError = async (fn) => {
+      const original = console.error;
+      console.error = () => {};
+      try { await fn(); } finally { console.error = original; }
+    };
+
+    describe('when it runs', () => {
+      it('does not validate a pool that was fetched within the last 7 days', async () => {
+        store.feedCache = poolCache({ fetchedAt: Date.now() - 6 * DAY });
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 0);
+        assert.equal(calls.nearby.length, 0);
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()));
+      });
+
+      it('validates a pool whose fetchedAt is 7 or more days old and has no validatedAt (a cache from before this field existed)', async () => {
+        store.feedCache = poolCache({ fetchedAt: Date.now() - 7 * DAY - 1000 });
+        availability = serverSays(['1', '2', '3']);
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 1);
+      });
+
+      it('goes by validatedAt when it is set, even though fetchedAt is much older', async () => {
+        store.feedCache = poolCache({ fetchedAt: Date.now() - 30 * DAY, validatedAt: Date.now() - 1 * DAY });
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 0, 'validated yesterday, so nothing to do');
+      });
+
+      it('validates when validatedAt is old even though fetchedAt is recent (kept-unseen cards carried across a refresh)', async () => {
+        store.feedCache = poolCache({ fetchedAt: Date.now() - 1 * DAY, validatedAt: Date.now() - 9 * DAY });
+        availability = serverSays(['1', '2', '3']);
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 1);
+      });
+
+      it('does nothing when the cache carries no usable timestamp at all', async () => {
+        store.feedCache = poolCache({ fetchedAt: undefined });
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 0);
+      });
+
+      it('does nothing when there is no cache, or an empty one', async () => {
+        store.feedCache = null;
+        await window.start();
+        store.feedCache = poolCache({ cards: [] });
+        await window.start();
+
+        assert.equal(calls.validate.length, 0);
+      });
+
+      it('skips validation while offline, without recording a failure cooldown', async () => {
+        Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+        store.feedCache = poolCache();
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 0);
+        assert.equal(store.feedCache.validationRetryAfter, undefined);
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()), 'the cache is still served');
+      });
+    });
+
+    describe('what it does to the pool', () => {
+      it('sends every cached id in one request and keeps only the ids still available, in their original order', async () => {
+        store.feedCache = poolCache({ cards: cardsFor(['1', '2', '3', '4', '5']) });
+        availability = serverSays(['5', '3', '1']); // response order is irrelevant
+
+        await window.start();
+
+        assert.deepEqual(calls.validate, [['1', '2', '3', '4', '5']]);
+        assert.deepEqual(store.feedCache.cards.map((c) => c.id), ['1', '3', '5']);
+      });
+
+      it('never shows a card that was found to be gone', async () => {
+        store.feedCache = poolCache({ cards: cardsFor(['dead1', 'dead2', 'alive']) });
+        availability = serverSays(['alive']);
+
+        await window.start();
+
+        assert.equal(shownName(), 'Catalive');
+      });
+
+      it('keeps every still-available unseen card, and drops gone cards from seenIds too so the seen-ratio math stays honest', async () => {
+        store.feedCache = poolCache({
+          cards: cardsFor(['1', '2', '3', '4', '5', '6']),
+          seenIds: ['1', '2'] // 1 alive+seen, 2 dead+seen; 3-6 unseen (4 dead)
+        });
+        availability = serverSays(['1', '3', '5', '6']);
+
+        await window.start();
+
+        // start() then serves one card from the pruned pool and marks it seen.
+        const ids = store.feedCache.cards.map((c) => c.id);
+        assert.deepEqual(ids, ['1', '3', '5', '6']);
+        assert.ok(!store.feedCache.seenIds.includes('2'), 'the dead-but-seen id must not linger as a phantom');
+        assert.ok(!store.feedCache.seenIds.includes('4'));
+        assert.ok(store.feedCache.seenIds.includes('1'), 'a still-available seen card stays seen');
+        assert.ok(store.feedCache.seenIds.every((id) => ids.includes(id)));
+      });
+
+      it('stamps validatedAt with now and leaves page, location, radius and fetchedAt exactly as they were', async () => {
+        const before = poolCache({ page: 4, radiusMiles: 75 });
+        store.feedCache = before;
+        availability = serverSays(['1', '2', '3']);
+
+        const start = Date.now();
+        await window.start();
+
+        assert.ok(store.feedCache.validatedAt >= start && store.feedCache.validatedAt <= Date.now());
+        assert.equal(store.feedCache.page, 4, 'validation must never advance pagination');
+        assert.equal(store.feedCache.radiusMiles, 75);
+        assert.equal(store.feedCache.fetchedAt, before.fetchedAt);
+        assert.deepEqual(store.feedCache.location, LOCATION);
+      });
+
+      it('does not fetch a new page when validation alone is enough', async () => {
+        store.feedCache = poolCache();
+        availability = serverSays(['1', '2']);
+
+        await window.start();
+
+        assert.equal(calls.nearby.length, 0, 'plenty unseen and survivors left: no search, no radius escalation');
+      });
+
+      it('does not validate again on the next tab once it has just run', async () => {
+        store.feedCache = poolCache();
+        availability = serverSays(['1', '2', '3']);
+
+        await window.start();
+        await window.start();
+
+        assert.equal(calls.validate.length, 1);
+      });
+
+      it('splits a pool larger than 100 ids into 100-id requests and keeps survivors from every chunk', async () => {
+        const ids = Array.from({ length: 150 }, (_, i) => String(i + 1));
+        store.feedCache = poolCache({ cards: cardsFor(ids) });
+        availability = (asked) => ({ ok: true, json: async () => ({ availableIds: asked.filter((id) => Number(id) % 2 === 0) }) });
+
+        await window.start();
+
+        assert.deepEqual(calls.validate.map((chunk) => chunk.length), [100, 50]);
+        assert.deepEqual(calls.validate.flat(), ids);
+        assert.equal(store.feedCache.cards.length, 75);
+        assert.ok(store.feedCache.cards.every((c) => Number(c.id) % 2 === 0));
+      });
+
+      it('leaves alone a card another tab added while the request was in flight', async () => {
+        store.feedCache = poolCache({ cards: cardsFor(['1', '2']) });
+        availability = async () => {
+          // Another tab refreshes the cache while this one waits on the server.
+          store.feedCache = { ...store.feedCache, cards: [...store.feedCache.cards, ...cardsFor(['from-other-tab'])] };
+          return { ok: true, json: async () => ({ availableIds: ['1'] }) };
+        };
+
+        await window.start();
+
+        assert.deepEqual(store.feedCache.cards.map((c) => c.id).sort(), ['1', 'from-other-tab']);
+      });
+
+      it('deduplicates ids it asks about', async () => {
+        store.feedCache = poolCache({ cards: [...cardsFor(['1']), ...cardsFor(['1']), ...cardsFor(['2'])] });
+        availability = serverSays(['1', '2']);
+
+        await window.start();
+
+        assert.deepEqual(calls.validate, [['1', '2']]);
+      });
+    });
+
+    describe('interaction with the normal refresh', () => {
+      it('still refreshes afterwards if pruning pushes the seen ratio over the threshold, and advances the page normally', async () => {
+        store.feedCache = poolCache({
+          cards: cardsFor(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']),
+          seenIds: ['1', '2', '3', '4', '5', '6'], // 60% seen: no refresh on its own
+          page: 2
+        });
+        availability = serverSays(['1', '2', '3', '4', '5', '6']); // 7-10 (all unseen) are gone -> 100% seen
+
+        await window.start();
+
+        assert.equal(calls.validate.length, 1);
+        assert.equal(calls.nearby.length, 1);
+        assert.equal(calls.nearby[0].page, 3, 'an ordinary top-up refresh: page + 1');
+      });
+
+      it('carries validatedAt forward on a refresh that keeps unseen cards, so their age is not hidden', async () => {
+        const validatedAt = Date.now() - 3 * DAY;
+        store.feedCache = poolCache({ fetchedAt: Date.now() - 3 * DAY, validatedAt, cards: cardsFor(['1', '2', '3']), seenIds: ['1', '2'] });
+
+        await window.refresh(LOCATION);
+
+        assert.equal(store.feedCache.validatedAt, validatedAt);
+        assert.ok(store.feedCache.fetchedAt > validatedAt);
+        assert.ok(store.feedCache.cards.some((c) => c.id === '3'), 'the unseen card was kept');
+      });
+
+      it('falls back to fetchedAt as the carried-forward validatedAt for a pre-existing cache', async () => {
+        const fetchedAt = Date.now() - 3 * DAY;
+        store.feedCache = poolCache({ fetchedAt, cards: cardsFor(['1', '2']), seenIds: ['1'] });
+
+        await window.refresh(LOCATION);
+
+        assert.equal(store.feedCache.validatedAt, fetchedAt);
+      });
+
+      it('resets validatedAt to now when a refresh keeps nothing from the old pool', async () => {
+        store.feedCache = poolCache({ validatedAt: Date.now() - 20 * DAY, cards: cardsFor(['1', '2']), seenIds: ['1', '2'] });
+
+        const start = Date.now();
+        await window.refresh(LOCATION);
+
+        assert.ok(store.feedCache.validatedAt >= start);
+        assert.deepEqual(store.feedCache.cards.map((c) => c.id).sort(), ['fresh1', 'fresh2']);
+      });
+
+      it('resets validatedAt for a brand-new location, and drops any failure cooldown with the rest of the old cache', async () => {
+        store.feedCache = poolCache({ location: { lat: 9, lon: 9 }, validatedAt: Date.now() - 20 * DAY, validationRetryAfter: Date.now() + DAY });
+
+        const start = Date.now();
+        await window.refresh(LOCATION);
+
+        assert.ok(store.feedCache.validatedAt >= start);
+        assert.equal(store.feedCache.validationRetryAfter, undefined);
+      });
+    });
+
+    describe('when every cached card is gone', () => {
+      it('refreshes from page 1 with nothing kept, and never shows a dead card', async () => {
+        store.feedCache = poolCache({ page: 6, seenIds: ['1'] });
+        availability = serverSays([]);
+        const shown = [];
+        const observer = new window.MutationObserver(() => { const n = shownName(); if (n) shown.push(n); });
+        observer.observe(document.getElementById('card'), { childList: true, subtree: true });
+
+        await window.start();
+        observer.disconnect();
+
+        assert.equal(calls.nearby.length, 1);
+        assert.equal(calls.nearby[0].page, 1, 'a dead pool restarts pagination instead of walking further out');
+        assert.deepEqual(store.feedCache.cards.map((c) => c.id).sort(), ['fresh1', 'fresh2']);
+        assert.equal(store.feedCache.page, 1);
+        assert.ok(['Catfresh1', 'Catfresh2'].includes(shownName()));
+        assert.ok(shown.every((name) => name.startsWith('Catfresh')), `only fresh cats were ever shown, saw: ${shown}`);
+      });
+
+      it('leaves the old cache untouched, and shows the failure notice rather than a dead card, if that refresh fails', async () => {
+        const before = poolCache();
+        store.feedCache = before;
+        availability = serverSays([]);
+        window.fetch = async (url, options) => {
+          if (url.endsWith('/api/validate-cats')) return serverSays([])();
+          calls.nearby.push(JSON.parse(options.body));
+          return { ok: false, json: async () => ({ error: 'Unable to refresh nearby cats right now.' }) };
+        };
+
+        await silenceConsoleError(() => window.start());
+
+        assert.deepEqual(store.feedCache, before, 'nothing was written, so the cache is exactly as it was');
+        assert.equal(document.getElementById('card').hidden, true);
+        assert.ok(document.getElementById('notice').textContent.length > 0);
+      });
+
+      it('refresh({ discardPool }) ignores the prior pool entirely, even for the same location', async () => {
+        store.feedCache = poolCache({ cards: cardsFor(['1', '2', '3']), seenIds: ['1'] });
+
+        await window.refresh(LOCATION, 'from you', { discardPool: true });
+
+        assert.equal(calls.nearby[0].page, 1);
+        assert.deepEqual(store.feedCache.cards.map((c) => c.id).sort(), ['fresh1', 'fresh2'], 'unseen 2 and 3 were not kept');
+      });
+    });
+
+    describe('when validation fails', () => {
+      const cacheBefore = () => poolCache();
+
+      it('serves the cache as usual after a server error, and records a 1 hour cooldown', async () => {
+        store.feedCache = cacheBefore();
+        availability = async () => ({ ok: false, json: async () => ({ error: 'Unable to refresh nearby cats right now.' }) });
+
+        const start = Date.now();
+        await silenceConsoleError(() => window.start());
+
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()));
+        assert.equal(store.feedCache.cards.length, 3, 'nothing was dropped');
+        assert.ok(store.feedCache.validationRetryAfter >= start + 60 * 60 * 1000 - 1000);
+        assert.equal(store.feedCache.validatedAt, undefined, 'a failed check must not count as a validation');
+        assert.equal(document.getElementById('notice').textContent, '', 'a background check failing is not the user\'s problem');
+        assert.equal(calls.nearby.length, 0);
+      });
+
+      it('serves the cache when the request throws (network error or timeout)', async () => {
+        store.feedCache = cacheBefore();
+        availability = async () => { throw new Error('network down'); };
+
+        await silenceConsoleError(() => window.start());
+
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()));
+        assert.equal(store.feedCache.cards.length, 3);
+        assert.ok(store.feedCache.validationRetryAfter > Date.now());
+      });
+
+      it('serves the cache when an old server answers 404 (extension updated before the server)', async () => {
+        store.feedCache = cacheBefore();
+        availability = async () => ({ ok: false, status: 404, json: async () => ({ error: 'Not found' }) });
+
+        await silenceConsoleError(() => window.start());
+
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()));
+        assert.equal(store.feedCache.cards.length, 3);
+      });
+
+      it('treats a malformed success body as a failure, never as "everything is gone"', async () => {
+        for (const body of [{}, { availableIds: 'nope' }, { availableIds: null }]) {
+          store.feedCache = cacheBefore();
+          availability = async () => ({ ok: true, json: async () => body });
+
+          await silenceConsoleError(() => window.start());
+
+          assert.equal(store.feedCache.cards.length, 3, `body ${JSON.stringify(body)} must not empty the pool`);
+          assert.equal(calls.nearby.length, 0);
+        }
+      });
+
+      it('does not retry on the next tab within the cooldown, then does once it has passed', async () => {
+        store.feedCache = cacheBefore();
+        availability = async () => { throw new Error('network down'); };
+        await silenceConsoleError(() => window.start());
+        assert.equal(calls.validate.length, 1);
+
+        await window.start();
+        assert.equal(calls.validate.length, 1, 'still cooling down');
+
+        store.feedCache = { ...store.feedCache, validationRetryAfter: Date.now() - 1000 };
+        availability = serverSays(['1', '2', '3']);
+        await window.start();
+        assert.equal(calls.validate.length, 2, 'cooldown over');
+        assert.equal(store.feedCache.validationRetryAfter, undefined, 'a success clears the cooldown');
+        assert.ok(store.feedCache.validatedAt);
+      });
+
+      it('gives up after the first failed chunk and prunes nothing, even if an earlier chunk succeeded', async () => {
+        const ids = Array.from({ length: 150 }, (_, i) => String(i + 1));
+        store.feedCache = poolCache({ cards: cardsFor(ids) });
+        let chunkNumber = 0;
+        availability = async () => {
+          chunkNumber++;
+          if (chunkNumber === 2) throw new Error('second chunk failed');
+          return { ok: true, json: async () => ({ availableIds: [] }) };
+        };
+
+        await silenceConsoleError(() => window.start());
+
+        assert.equal(store.feedCache.cards.length, 150, 'a partial answer must never prune');
+      });
+
+      it('still starts even if recording the cooldown itself fails', async () => {
+        store.feedCache = cacheBefore();
+        availability = async () => { throw new Error('network down'); };
+        const realSet = window.chrome.storage.local.set;
+        window.chrome.storage.local.set = async (value) => {
+          if (value.feedCache && value.feedCache.validationRetryAfter) throw new Error('quota');
+          return realSet(value);
+        };
+
+        await silenceConsoleError(() => window.start());
+
+        assert.ok(['Cat1', 'Cat2', 'Cat3'].includes(shownName()));
+      });
     });
   });
 

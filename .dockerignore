@@ -5,6 +5,7 @@ node_modules
 extension
 test
 test-live
+test-support
 benchmark
 webstore
 tasks

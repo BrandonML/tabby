@@ -97,6 +97,29 @@ export function buildSearchRequest(location, miles, page = 1) {
   };
 }
 
+// Issue #79: revalidates specific cached listings without re-paging the
+// search. `animals.id` + `equal` with an array criteria acts as an "in"
+// filter (confirmed live: 99 of 100 real ids returned in one request, an
+// unknown id silently dropped), and the request hits the same
+// .../search/available/... endpoint as every other query here -- so an id
+// that doesn't come back is no longer an available listing.
+export function validateAnimalIds(input) {
+  const message = `Provide 1 to ${MAX_LIMIT} numeric animal ids.`;
+  if (!Array.isArray(input) || input.length === 0 || input.length > MAX_LIMIT) throw new Error(message);
+  const ids = input.map((id) => (typeof id === "number" ? String(id) : id));
+  if (!ids.every((id) => typeof id === "string" && /^\d{1,12}$/.test(id))) throw new Error(message);
+  return [...new Set(ids)];
+}
+
+export function buildAvailabilityRequest(ids) {
+  const safeIds = validateAnimalIds(ids);
+  const query = new URLSearchParams({ limit: String(MAX_LIMIT), page: "1", "fields[animals]": "name" });
+  return {
+    url: `${BASE_URL}/public/animals/search/available/cats/haspic/?${query}`,
+    body: { data: { filters: [{ fieldName: "animals.id", operation: "equal", criteria: safeIds }] } }
+  };
+}
+
 function includedIndex(included = []) {
   return new Map(included.map((resource) => [`${resource.type}:${resource.id}`, resource]));
 }
@@ -201,9 +224,7 @@ export function normalizeCards(payload) {
   }).filter(Boolean);
 }
 
-export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch, page = 1 } = {}) {
-  if (!apiKey) throw new Error("RG_API_KEY is not configured.");
-  const { url, body } = buildSearchRequest(location, miles, page);
+async function requestPayload({ url, body }, { apiKey, fetchImpl }) {
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { Authorization: apiKey, "Content-Type": CONTENT_TYPE, Accept: CONTENT_TYPE },
@@ -222,7 +243,22 @@ export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch,
   if (!payload || typeof payload !== "object") {
     throw new Error(`RescueGroups HTTP ${response.status}: empty or malformed response body`);
   }
+  return payload;
+}
+
+export async function searchRadius(location, miles, { apiKey, fetchImpl = fetch, page = 1 } = {}) {
+  if (!apiKey) throw new Error("RG_API_KEY is not configured.");
+  const payload = await requestPayload(buildSearchRequest(location, miles, page), { apiKey, fetchImpl });
   return normalizeCards(payload);
+}
+
+// Returns the subset of `ids` that are still available listings.
+export async function findAvailableIds(ids, { apiKey, fetchImpl = fetch } = {}) {
+  const request = buildAvailabilityRequest(ids); // bad input is a 400 regardless of server config
+  if (!apiKey) throw new Error("RG_API_KEY is not configured.");
+  const requested = new Set(request.body.data.filters[0].criteria);
+  const payload = await requestPayload(request, { apiKey, fetchImpl });
+  return (payload.data || []).map((animal) => String(animal.id)).filter((id) => requested.has(id));
 }
 
 export async function findNearbyCats(location, { apiKey, target = 40, fetchImpl = fetch, page = 1 } = {}) {

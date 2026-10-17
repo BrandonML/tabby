@@ -81,4 +81,43 @@ jobs:
           curl -fsS -o /dev/null -w "status=%{http_code} size=%{size_download}\n" \
             "$PROD_URL/api/photo-share?url=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$IMAGE_URL")"
 
+          # Issue #79: the extension revalidates a long-idle cache through this
+          # route. It fails open (a broken route just means stale cards keep
+          # getting served), so nothing else would notice it breaking in
+          # production. Ask about ids /api/nearby-cats just listed plus one
+          # that cannot exist (12 digits is the validator's max length): the
+          # impossible one must never come back, and at least one of the real
+          # ones must (not all -- a cat can be adopted between the two calls).
+          echo "-- POST /api/validate-cats --"
+          VALIDATE_BODY=$(echo "$NEARBY" | jq -c '{ids: ([.cards[0:3][].id] + ["999999999999"])}')
+          VALIDATED=$(curl -fsS -X POST "$PROD_URL/api/validate-cats" \
+            -H "Content-Type: application/json" \
+            -d "$VALIDATE_BODY")
+          echo "$VALIDATED" | jq .
+          node -e '
+            const asked = JSON.parse(process.argv[1]).ids;
+            const got = JSON.parse(process.argv[2]).availableIds;
+            const fake = asked.at(-1);
+            const real = asked.slice(0, -1);
+            if (got.includes(fake)) {
+              console.error("::error::/api/validate-cats reported an impossible id as available.");
+              process.exit(1);
+            }
+            if (!real.some((id) => got.includes(id))) {
+              console.error("::error::/api/validate-cats returned none of the ids /api/nearby-cats had just listed -- the by-id filter may have stopped working.");
+              process.exit(1);
+            }
+            console.log(`ok: ${got.length} of ${asked.length} ids reported available`);
+          ' "$VALIDATE_BODY" "$VALIDATED"
+
+          echo "-- POST /api/validate-cats rejects invalid ids --"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$PROD_URL/api/validate-cats" \
+            -H "Content-Type: application/json" \
+            -d '{"ids":["not-an-id"]}')
+          echo "status=$STATUS"
+          if [ "$STATUS" != "400" ]; then
+            echo "::error::/api/validate-cats returned $STATUS for an invalid id (expected 400) -- the route may be missing or its input validation broken."
+            exit 1
+          fi
+
           echo "All smoke checks passed -- safe to proceed with store submission."
