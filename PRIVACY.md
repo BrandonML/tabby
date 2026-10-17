@@ -1,6 +1,6 @@
 # Privacy Policy for Tabby
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-10-16_
 
 Tabby ("the extension") replaces your new tab page with one real, adoptable cat sourced from [RescueGroups.org](https://rescuegroups.org). It's the same extension package on both the Chrome Web Store and Edge Add-ons, and this policy applies to both. This policy explains what data Tabby collects, how it's used, and how it's stored.
 

@@ -141,6 +141,8 @@ Tabby does not execute any remotely hosted code. All JavaScript running in the e
 
 **On the "Location" checkbox specifically:** check it Yes. Tabby reads device location (or accepts a ZIP code as an alternative) and transmits it to its own backend server to run the RescueGroups.org search. Even though the immediate recipient is Tabby's own first-party server rather than a third-party ad/analytics network, CWS's own definition of this category explicitly includes GPS coordinates and "information about things near the user's device" — that's exactly what's being sent, so it needs to be disclosed regardless of who the first recipient is.
 
+**Periodic availability check (v2.4.1):** at most about once a week, the extension sends the public listing IDs of the cats it has cached (no location, no user identifier) to its own backend, which forwards them to RescueGroups.org to confirm those listings are still available. Public animal listing IDs aren't user data in any of the categories above, so no row in the table changes, and the Location answer already covers the location-derived search. The behavior is disclosed in PRIVACY.md.
+
 ### Data Use Certification
 - [x] Data is NOT sold to third parties
 - [x] Data is NOT used for purposes unrelated to the extension's core functionality
